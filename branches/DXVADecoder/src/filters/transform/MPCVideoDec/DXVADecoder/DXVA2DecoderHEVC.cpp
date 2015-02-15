@@ -106,7 +106,7 @@ HRESULT CDXVA2DecoderHEVC::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME
 	}
 
 	IMediaSample* pSample;
-	CHECK_HR_FALSE (GetSurfaceWrapperData(pFrame, &pSample, NULL, NULL, NULL));
+	CHECK_HR_FALSE (GetSapleWrapperData(pFrame, &pSample, NULL, NULL));
 
 	DXVA_HEVC_Picture_Context *ctx_pic		= &m_DXVA_Picture_Context;
 	ctx_pic->pp.StatusReportFeedbackNumber	= StatusReportFeedbackNumber++;

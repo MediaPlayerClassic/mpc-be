@@ -95,7 +95,7 @@ HRESULT CDXVA2DecoderVC1::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME 
 	}
 
 	IMediaSample* pSample;
-	CHECK_HR_FALSE (GetSurfaceWrapperData(pFrame, &pSample, NULL, NULL, NULL));
+	CHECK_HR_FALSE (GetSapleWrapperData(pFrame, &pSample, NULL, NULL));
 
 	m_pFilter->HandleKeyFrame(got_picture);
 

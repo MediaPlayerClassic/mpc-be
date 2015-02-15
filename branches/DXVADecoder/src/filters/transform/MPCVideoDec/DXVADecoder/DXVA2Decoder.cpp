@@ -150,12 +150,15 @@ HRESULT CDXVA2Decoder::DisplayNextFrame()
 
 	AVFrame* pFrame = m_pFilter->GetFrame();
 	IMediaSample* pSample;
-	int nSurfaceIndex;
 	REFERENCE_TIME rtStop, rtStart;
-	CHECK_HR_FALSE (GetSurfaceWrapperData(pFrame, &pSample, &nSurfaceIndex, &rtStart, &rtStop));
+	CHECK_HR_FALSE (GetSapleWrapperData(pFrame, &pSample, &rtStart, &rtStop));
 
 	m_pFilter->ReorderBFrames(rtStart, rtStop);
 	m_pFilter->UpdateFrameTime(rtStart, rtStop);
+
+	if (rtStart < 0) {
+		return S_OK;
+	}
 
 	m_pFilter->ReconnectOutput(m_pFilter->PictWidth(), m_pFilter->PictHeight(), true, false, m_pFilter->GetDuration());
 
@@ -211,17 +214,13 @@ HRESULT CDXVA2Decoder::GetFreeSurfaceIndex(int& nSurfaceIndex, IMediaSample** pp
 	return hr;
 }
 
-HRESULT CDXVA2Decoder::GetSurfaceWrapperData(AVFrame* pFrame, IMediaSample** pSample, int* nSurfaceIndex, REFERENCE_TIME* rtStart, REFERENCE_TIME* rtStop)
+HRESULT CDXVA2Decoder::GetSapleWrapperData(AVFrame* pFrame, IMediaSample** pSample, REFERENCE_TIME* rtStart, REFERENCE_TIME* rtStop)
 {
 	CheckPointer(pFrame, E_FAIL);
 
 	SampleWrapper* pSampleWrapper = (SampleWrapper*)pFrame->data[3];
 	if (pSampleWrapper) {
 		*pSample = pSampleWrapper->pSample;
-
-		if (nSurfaceIndex) {
-			*nSurfaceIndex = pSampleWrapper->nSurfaceIndex;
-		}
 		
 		if (rtStart && rtStop) {
 			*rtStart = pFrame->pkt_pts;
@@ -248,7 +247,6 @@ HRESULT CDXVA2Decoder::get_buffer_dxva(AVFrame *pic)
 
 	SampleWrapper* pSampleWrapper	= DNew SampleWrapper();
 	pSampleWrapper->opaque			= (void*)this;
-	pSampleWrapper->nSurfaceIndex	= nSurfaceIndex;
 	pSampleWrapper->pSample			= pSample;
 
 	pic->data[3]	= (uint8_t *)pSampleWrapper;

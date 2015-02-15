@@ -30,7 +30,6 @@ class CDXVA2Decoder : public CDXVADecoder
 {
 	struct SampleWrapper {
 		void*						opaque;
-		int							nSurfaceIndex;
 		CComPtr<IMediaSample>		pSample;
 	};
 
@@ -57,7 +56,7 @@ protected :
 	HRESULT							DisplayNextFrame();
 	HRESULT							GetFreeSurfaceIndex(int& nSurfaceIndex, IMediaSample** ppSampleToDeliver);
 
-	HRESULT							GetSurfaceWrapperData(AVFrame* pFrame, IMediaSample** pSample, int* nSurfaceIndex, REFERENCE_TIME* rtStart, REFERENCE_TIME* rtStop);
+	HRESULT							GetSapleWrapperData(AVFrame* pFrame, IMediaSample** pSample, REFERENCE_TIME* rtStart, REFERENCE_TIME* rtStop);
 
 	GUID							m_guidDecoder;
 	CMPCVideoDecFilter*				m_pFilter;

@@ -125,7 +125,7 @@ HRESULT CDXVA2DecoderH264::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME
 	}
 
 	IMediaSample* pSample;
-	CHECK_HR_FALSE (GetSurfaceWrapperData(pFrame, &pSample, NULL, NULL, NULL));
+	CHECK_HR_FALSE (GetSapleWrapperData(pFrame, &pSample, NULL, NULL));
 
 	for (UINT i = 0; i < _countof(m_DXVA_Context.ctx_pic); i++) {
 		DXVA_H264_Picture_Context* ctx_pic = &m_DXVA_Context.ctx_pic[i];
