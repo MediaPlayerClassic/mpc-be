@@ -397,9 +397,7 @@ typedef struct VC1Context{
 
     // ==> Start patch MPC
     int recovered;
-    int second_field_offset;
-    void* pPictureParameters;
-    void* pSliceInfo;
+    void* dxva_context;
     // <== End patch MPC
 } VC1Context;
 

@@ -21,12 +21,12 @@
 #pragma once
 
 #include <dx/d3dx9.h>
-#include <videoacc.h>	// DXVA1
-#include <dxva2api.h>	// DXVA2
+#include <dxva2api.h>
 #include "../BaseVideoFilter/BaseVideoFilter.h"
 #include "IMPCVideoDec.h"
 #include "MPCVideoDecSettingsWnd.h"
-#include "DXVADecoder.h"
+#include "./DXVADecoder/DXVADecoder.h"
+#include "./DXVADecoder/DXVA2Decoder.h"
 #include "FormatConverter.h"
 #include "../../../apps/mplayerc/FilterEnum.h"
 
@@ -128,13 +128,9 @@ protected:
 	LARGE_INTEGER							m_VideoDriverVersion;
 	CString									m_strDeviceDescription;
 
-	// === DXVA1 variables
-	DDPIXELFORMAT							m_DDPixelFormat;
-
 	// === DXVA2 variables
 	CComPtr<IDirect3DDeviceManager9>		m_pDeviceManager;
 	CComPtr<IDirectXVideoDecoderService>	m_pDecoderService;
-	CComPtr<IDirect3DSurface9>				m_pDecoderRenderTarget;
 	DXVA2_ConfigPictureDecode				m_DXVA2Config;
 	HANDLE									m_hDevice;
 	DXVA2_VideoDesc							m_VideoDesc;
@@ -265,14 +261,6 @@ public:
 	void						SetTypeSpecificFlags(IMediaSample* pMS);
 	void						HandleKeyFrame(int& got_picture);
 
-	// === DXVA1 functions
-	const DDPIXELFORMAT*		GetPixelFormat() { return &m_DDPixelFormat; }
-	HRESULT						FindDXVA1DecoderConfiguration(IAMVideoAccelerator* pAMVideoAccelerator, const GUID* guidDecoder, DDPIXELFORMAT* pPixelFormat);
-	HRESULT						CheckDXVA1Decoder(const GUID *pGuid);
-	void						SetDXVA1Params(const GUID* pGuid, DDPIXELFORMAT* pPixelFormat);
-	WORD						GetDXVA1RestrictedMode();
-	HRESULT						CreateDXVA1Decoder(IAMVideoAccelerator* pAMVideoAccelerator, const GUID* pDecoderGuid, DWORD dwSurfaceCount);
-
 
 	// === DXVA2 functions
 	void						FillInVideoDescription(DXVA2_VideoDesc *pDesc, D3DFORMAT Format = D3DFMT_A8R8G8B8);
@@ -302,7 +290,6 @@ private:
 };
 
 class CVideoDecOutputPin : public CBaseVideoOutputPin
-	, public IAMVideoAcceleratorNotify
 {
 public:
 	CVideoDecOutputPin(TCHAR* pObjectName, CBaseVideoFilter* pFilter, HRESULT* phr, LPCWSTR pName);
@@ -313,16 +300,8 @@ public:
 	DECLARE_IUNKNOWN
 	STDMETHODIMP		NonDelegatingQueryInterface(REFIID riid, void** ppv);
 
-	// IAMVideoAcceleratorNotify
-	STDMETHODIMP		GetUncompSurfacesInfo(const GUID *pGuid, LPAMVAUncompBufferInfo pUncompBufferInfo);
-	STDMETHODIMP		SetUncompSurfacesInfo(DWORD dwActualUncompSurfacesAllocated);
-	STDMETHODIMP		GetCreateVideoAcceleratorData(const GUID *pGuid, LPDWORD pdwSizeMiscData, LPVOID *ppMiscData);
-
 private :
 	CMPCVideoDecFilter*	m_pVideoDecFilter;
-	DWORD				m_dwDXVA1SurfaceCount;
-	GUID				m_GuidDecoderDXVA1;
-	DDPIXELFORMAT		m_ddUncompPixelFormat;
 };
 
 struct SUPPORTED_FORMATS {

@@ -20,27 +20,20 @@
 
 #pragma once
 
-#include "DXVADecoder.h"
+#include "DXVA2Decoder.h"
 #include <ffmpeg/libavcodec/dxva_h264.h>
 
-class CDXVADecoderH264 : public CDXVADecoder
+class CDXVA2DecoderH264 : public CDXVA2Decoder
 {
-public:
-	CDXVADecoderH264(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVAMode nMode, int nPicEntryNumber, DXVA2_ConfigPictureDecode* pDXVA2Config);
-	virtual ~CDXVADecoderH264();
-
-	virtual void		Flush();
-	virtual HRESULT		CopyBitstream(BYTE* pDXVABuffer, BYTE* pBuffer, UINT& nSize, UINT nDXVASize = UINT_MAX);
-	virtual HRESULT		DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop);
-
-private:
 	DXVA_H264_Context	m_DXVA_Context;
-
-	bool				m_bUseLongSlice;
-
 	UINT				m_nFieldNum;
 	UINT				StatusReportFeedbackNumber;
 	USHORT				Reserved16Bits;
 
-	void				Init();
+public:
+	CDXVA2DecoderH264(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVA2_ConfigPictureDecode* pDXVA2Config);
+
+	virtual void		Flush();
+	virtual HRESULT		DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop);
+	virtual HRESULT		CopyBitstream(BYTE* pDXVABuffer, UINT& nSize, UINT nDXVASize = UINT_MAX);
 };

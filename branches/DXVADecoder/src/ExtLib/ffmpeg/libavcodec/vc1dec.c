@@ -40,7 +40,7 @@
 
 // ==> Start patch MPC
 #include <windows.h>
-#include <dxva.h>
+#include "dxva_vc1.h"
 // <== End patch MPC
 
 #if CONFIG_WMV3IMAGE_DECODER || CONFIG_VC1IMAGE_DECODER
@@ -605,9 +605,9 @@ av_cold int ff_vc1_decode_end(AVCodecContext *avctx)
 }
 
 // ==> Start patch MPC
-static void fill_picture_parameters(AVCodecContext *avctx,
-                                    const VC1Context *v,
-                                    DXVA_PictureParameters *pp)
+static void dxva_fill_picture_parameters(AVCodecContext *avctx,
+                                         const VC1Context *v,
+                                         DXVA_PictureParameters *pp)
 {
     const MpegEncContext *s = &v->s;
     const Picture *current_picture = s->current_picture_ptr;
@@ -719,8 +719,8 @@ static void fill_picture_parameters(AVCodecContext *avctx,
     pp->bBitstreamConcealmentMethod = 0;
 }
 
-static void fill_slice(AVCodecContext *avctx, DXVA_SliceInfo *slice,
-                       const uint8_t *buffer, uint32_t size)
+static void dxva_fill_slice(AVCodecContext *avctx, DXVA_VC1_Picture_Context *ctx_pic,
+                            const uint8_t *buffer, uint32_t size)
 {
     const VC1Context *v = avctx->priv_data;
     const MpegEncContext *s = &v->s;
@@ -731,17 +731,20 @@ static void fill_slice(AVCodecContext *avctx, DXVA_SliceInfo *slice,
         size   -= 4;
     }
 
-    memset(slice, 0, sizeof(*slice));
-    slice->wHorizontalPosition = 0;
-    slice->wVerticalPosition   = s->mb_y;
-    slice->dwSliceBitsInBuffer = 8 * size;
-    slice->dwSliceDataLocation = 0;
-    slice->bStartCodeBitOffset = 0;
-    slice->bReservedBits       = (s->pict_type == AV_PICTURE_TYPE_B && !v->bi_type) ? v->bfraction_lut_index + 9 : 0;
-    slice->wMBbitOffset        = v->p_frame_skipped ? 0xffff : get_bits_count(&s->gb) + (avctx->codec_id == AV_CODEC_ID_VC1 ? 32 : 0);
-    slice->wNumberMBsInSlice   = s->mb_width * s->mb_height; /* XXX We assume 1 slice */
-    slice->wQuantizerScaleCode = v->pq;
-    slice->wBadSliceChopping   = 0;
+    ctx_pic->bitstream_size = size;
+    ctx_pic->bitstream      = buffer;
+
+    memset(&ctx_pic->slice, 0, sizeof(ctx_pic->slice));
+    ctx_pic->slice.wHorizontalPosition = 0;
+    ctx_pic->slice.wVerticalPosition   = s->mb_y;
+    ctx_pic->slice.dwSliceBitsInBuffer = 8 * size;
+    ctx_pic->slice.dwSliceDataLocation = 0;
+    ctx_pic->slice.bStartCodeBitOffset = 0;
+    ctx_pic->slice.bReservedBits       = (s->pict_type == AV_PICTURE_TYPE_B && !v->bi_type) ? v->bfraction_lut_index + 9 : 0;
+    ctx_pic->slice.wMBbitOffset        = v->p_frame_skipped ? 0xffff : get_bits_count(&s->gb) + (avctx->codec_id == AV_CODEC_ID_VC1 ? 32 : 0);
+    ctx_pic->slice.wNumberMBsInSlice   = s->mb_width * s->mb_height; /* XXX We assume 1 slice */
+    ctx_pic->slice.wQuantizerScaleCode = v->pq;
+    ctx_pic->slice.wBadSliceChopping   = 0;
 }
 // <== End patch MPC
 
@@ -766,10 +769,6 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
     } *slices = NULL, *tmp;
 
     v->second_field = 0;
-
-    // ==> Start patch MPC
-    v->second_field_offset = 0;
-    // <== End patch MPC
 
     if(s->flags & CODEC_FLAG_LOW_DELAY)
         s->low_delay = 1;
@@ -1086,16 +1085,17 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
         }
     } else
         // ==> Start patch MPC
-        if (avctx->using_dxva) {
+        if (avctx->using_dxva && v->dxva_context) {
+            DXVA_VC1_Context* ctx = (DXVA_VC1_Context*)v->dxva_context;
+
             if (v->field_mode && buf_start_second_field) {
                 // decode first field
-                v->second_field_offset = buf_start_second_field - buf;
+                DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
+
                 s->picture_structure = PICT_BOTTOM_FIELD - v->tff;
 
-                DXVA_PictureParameters* pp = &((DXVA_PictureParameters*)v->pPictureParameters)[0];
-                fill_picture_parameters(avctx, v, pp);
-                DXVA_SliceInfo* si = &((DXVA_SliceInfo*)v->pSliceInfo)[0];
-                fill_slice(avctx, si, buf_start, buf_start_second_field - buf_start);
+                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                dxva_fill_slice(avctx, ctx_pic, buf_start, buf_start_second_field - buf_start);
 
                 // decode second field
                 s->gb = slices[n_slices1 + 1].gb;
@@ -1108,17 +1108,20 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
                 }
                 v->s.current_picture_ptr->f->pict_type = v->s.pict_type;
 
-                pp = &((DXVA_PictureParameters*)v->pPictureParameters)[1];
-                fill_picture_parameters(avctx, v, pp);
-                si = &((DXVA_SliceInfo*)v->pSliceInfo)[1];
-                fill_slice(avctx, si, buf_start_second_field, (buf + buf_size) - buf_start_second_field);
+                ctx_pic = &ctx->ctx_pic[1];
+                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                dxva_fill_slice(avctx, ctx_pic, buf_start_second_field, (buf + buf_size) - buf_start_second_field);
+
+                ctx->frame_count = 2;
             } else {
                 s->picture_structure = PICT_FRAME;
 
-                DXVA_PictureParameters* pp = &((DXVA_PictureParameters*)v->pPictureParameters)[0];
-                fill_picture_parameters(avctx, v, pp);
-                DXVA_SliceInfo* si = &((DXVA_SliceInfo*)v->pSliceInfo)[0];
-                fill_slice(avctx, si, buf_start, (buf + buf_size) - buf_start);
+                DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
+
+                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                dxva_fill_slice(avctx, ctx_pic, buf_start, (buf + buf_size) - buf_start);
+
+                ctx->frame_count = 1;
             }
         } else
         // <== End patch MPC
