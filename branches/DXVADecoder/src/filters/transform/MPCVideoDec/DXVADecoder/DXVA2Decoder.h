@@ -42,7 +42,7 @@ public :
 
 	virtual HRESULT					CopyBitstream(BYTE* pDXVABuffer, UINT& nSize, UINT nDXVASize = UINT_MAX) PURE;
 
-	virtual HRESULT					get_buffer_dxva(struct AVFrame *pic);
+	HRESULT							get_buffer_dxva(struct AVFrame *pic);
 	static void						release_buffer_dxva(void *opaque, uint8_t *data);
 
 protected :

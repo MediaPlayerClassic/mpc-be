@@ -42,9 +42,9 @@ struct AVFrame;
 class CDXVADecoder
 {
 public :
+	virtual			~CDXVADecoder() {};
+
 	virtual void	Flush() { return; };
 	virtual HRESULT	DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop) PURE;
 	virtual void	EndOfStream() { return; };
-
-	virtual HRESULT	get_buffer_dxva(struct AVFrame *pic) { return S_OK; }
 };

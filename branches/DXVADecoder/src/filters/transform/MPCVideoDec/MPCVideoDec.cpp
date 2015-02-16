@@ -1683,7 +1683,7 @@ HRESULT CMPCVideoDecFilter::InitDecoder(const CMediaType *pmt)
 		m_pAVCtx->codec_tag = MAKEFOURCC('M','P','E','G');
 	}
 
-	if (m_pAVCtx->using_dxva) {
+	if (m_pAVCtx->using_dxva && IsWinVistaOrLater()) {
 		m_pAVCtx->get_buffer2		= av_get_buffer;
 	}
 
@@ -3137,11 +3137,7 @@ STDMETHODIMP_(MPC_DEINTERLACING_FLAGS) CMPCVideoDecFilter::GetDeinterlacing()
 
 STDMETHODIMP_(GUID*) CMPCVideoDecFilter::GetDXVADecoderGuid()
 {
-	if (m_pGraph == NULL) {
-		return NULL;
-	} else {
-		return &m_DXVADecoderGUID;
-	}
+	return m_pGraph ? &m_DXVADecoderGUID : NULL;
 }
 
 STDMETHODIMP CMPCVideoDecFilter::SetActiveCodecs(ULONGLONG nValue)
@@ -3303,44 +3299,44 @@ STDMETHODIMP_(CString) CMPCVideoDecFilter::GetInformation(MPCInfo index)
 	CString infostr;
 
 	switch (index) {
-	case INFO_MPCVersion:
-		infostr.Format(_T("v%s (build %d)"), CString(MPC_VERSION_STR), MPC_VERSION_REV);
-		break;
-	case INFO_InputFormat:
-		if (m_pAVCtx) {
-			infostr = m_pAVCtx->codec_descriptor->name;;
-			if (const AVPixFmtDescriptor* pfdesc = av_pix_fmt_desc_get(m_pAVCtx->pix_fmt)) {
-				if (pfdesc->flags & (AV_PIX_FMT_FLAG_RGB | AV_PIX_FMT_FLAG_PAL)) {
-					infostr.AppendFormat(_T(", %d-bit"), GetLumaBits(m_pAVCtx->pix_fmt));
-				}
-				else {
-					infostr.AppendFormat(_T(", %d-bit %s"), GetLumaBits(m_pAVCtx->pix_fmt), GetChromaSubsamplingStr(m_pAVCtx->pix_fmt));
+		case INFO_MPCVersion:
+			infostr.Format(_T("v%s (build %d)"), CString(MPC_VERSION_STR), MPC_VERSION_REV);
+			break;
+		case INFO_InputFormat:
+			if (m_pAVCtx) {
+				infostr = m_pAVCtx->codec_descriptor->name;;
+				if (const AVPixFmtDescriptor* pfdesc = av_pix_fmt_desc_get(m_pAVCtx->pix_fmt)) {
+					if (pfdesc->flags & (AV_PIX_FMT_FLAG_RGB | AV_PIX_FMT_FLAG_PAL)) {
+						infostr.AppendFormat(_T(", %d-bit"), GetLumaBits(m_pAVCtx->pix_fmt));
+					}
+					else {
+						infostr.AppendFormat(_T(", %d-bit %s"), GetLumaBits(m_pAVCtx->pix_fmt), GetChromaSubsamplingStr(m_pAVCtx->pix_fmt));
+					}
 				}
 			}
-		}
-		break;
-	case INFO_FrameSize:
-		if (m_w && m_h) {
-			LONG sarx = m_arx * m_h;
-			LONG sary = m_ary * m_w;
-			ReduceDim(sarx, sary);
-			infostr.Format(_T("%dx%d, SAR %ld:%ld, DAR %d:%d"), m_w, m_h, sarx, sary, m_arx, m_ary);
-		}
-		break;
-	case INFO_OutputFormat:
-		if (GUID* DxvaGuid = GetDXVADecoderGuid()) {
-			if (*DxvaGuid != GUID_NULL) {
-				infostr.Format(_T("DXVA (%s)"), GetDXVAMode(DxvaGuid));
-				break;
+			break;
+		case INFO_FrameSize:
+			if (m_w && m_h) {
+				LONG sarx = m_arx * m_h;
+				LONG sary = m_ary * m_w;
+				ReduceDim(sarx, sary);
+				infostr.Format(_T("%dx%d, SAR %ld:%ld, DAR %d:%d"), m_w, m_h, sarx, sary, m_arx, m_ary);
 			}
-		}
-		if (const SW_OUT_FMT* swof = GetSWOF(m_FormatConverter.GetOutPixFormat())) {
-			infostr.Format(_T("%s (%d-bit %s)"), swof->name, swof->luma_bits, GetChromaSubsamplingStr(swof->av_pix_fmt));
-		}
-		break;
-	case INFO_GraphicsAdapter:
-		infostr = m_strDeviceDescription;
-		break;
+			break;
+		case INFO_OutputFormat:
+			if (GUID* DxvaGuid = GetDXVADecoderGuid()) {
+				if (*DxvaGuid != GUID_NULL) {
+					infostr.Format(_T("DXVA (%s)"), GetDXVAMode(DxvaGuid));
+					break;
+				}
+			}
+			if (const SW_OUT_FMT* swof = GetSWOF(m_FormatConverter.GetOutPixFormat())) {
+				infostr.Format(_T("%s (%d-bit %s)"), swof->name, swof->luma_bits, GetChromaSubsamplingStr(swof->av_pix_fmt));
+			}
+			break;
+		case INFO_GraphicsAdapter:
+			infostr = m_strDeviceDescription;
+			break;
 	}
 
 	return infostr;
@@ -3348,11 +3344,11 @@ STDMETHODIMP_(CString) CMPCVideoDecFilter::GetInformation(MPCInfo index)
 
 int CMPCVideoDecFilter::av_get_buffer(struct AVCodecContext *c, AVFrame *pic, int flags)
 {
-	CMPCVideoDecFilter* pFilter = (CMPCVideoDecFilter*)(c->opaque);
+	CMPCVideoDecFilter* pFilter = (CMPCVideoDecFilter*)c->opaque;
 
 	int ret = avcodec_default_get_buffer2(c, pic, flags);
 	if (ret == 0 && pFilter->m_pDXVADecoder) {
-		pFilter->m_pDXVADecoder->get_buffer_dxva(pic);
+		(static_cast<CDXVA2Decoder*>(pFilter->m_pDXVADecoder))->get_buffer_dxva(pic);
 	}
 
 	return ret;
@@ -3360,8 +3356,8 @@ int CMPCVideoDecFilter::av_get_buffer(struct AVCodecContext *c, AVFrame *pic, in
 
 CVideoDecOutputPin::CVideoDecOutputPin(TCHAR* pObjectName, CBaseVideoFilter* pFilter, HRESULT* phr, LPCWSTR pName)
 	: CBaseVideoOutputPin(pObjectName, pFilter, phr, pName)
+	, m_pVideoDecFilter(static_cast<CMPCVideoDecFilter*>(pFilter))
 {
-	m_pVideoDecFilter = static_cast<CMPCVideoDecFilter*>(pFilter);
 }
 
 CVideoDecOutputPin::~CVideoDecOutputPin()
@@ -3372,9 +3368,9 @@ HRESULT CVideoDecOutputPin::InitAllocator(IMemAllocator **ppAlloc)
 {
 	if (m_pVideoDecFilter->UseDXVA2()) {
 		return m_pVideoDecFilter->InitAllocator(ppAlloc);
-	} else {
-		return __super::InitAllocator(ppAlloc);
 	}
+	
+	return __super::InitAllocator(ppAlloc);
 }
 
 STDMETHODIMP CVideoDecOutputPin::NonDelegatingQueryInterface(REFIID riid, void** ppv)

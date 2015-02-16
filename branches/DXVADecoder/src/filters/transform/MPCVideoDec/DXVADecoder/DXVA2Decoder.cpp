@@ -78,8 +78,8 @@ HRESULT CDXVA2Decoder::AddExecuteBuffer(DWORD CompressedBufferType, UINT nSize, 
 {
 	HRESULT	hr			= E_INVALIDARG;
 	DWORD	dwNumMBs	= 0;
-	BYTE*	pDXVABuffer	= NULL;
 	UINT	nDXVASize	= 0;
+	BYTE*	pDXVABuffer	= NULL;
 	
 	hr = m_pDirectXVideoDec->GetBuffer(CompressedBufferType, (void**)&pDXVABuffer, &nDXVASize);
 	ASSERT(nSize <= nDXVASize);
