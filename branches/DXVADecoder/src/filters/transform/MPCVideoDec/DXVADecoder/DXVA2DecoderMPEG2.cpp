@@ -99,14 +99,15 @@ HRESULT CDXVA2DecoderMPEG2::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIM
 		m_nFieldNum = i;
 		UpdatePictureParams();
 
+		// Begin frame
 		CHECK_HR_FALSE (BeginFrame(pSample));
 		// Send picture parameters
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_PictureParametersBufferType, sizeof(DXVA_PictureParameters), &ctx_pic->pp));
-		// Add quantization matrix
+		// Send quantization matrix
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_InverseQuantizationMatrixBufferType, sizeof(DXVA_QmatrixData), &ctx_pic->qm));
-		// Add bitstream
+		// Send bitstream
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_BitStreamDateBufferType));
-		// Add slice control
+		// Send slice control
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_SliceControlBufferType, sizeof(DXVA_SliceInfo) * ctx_pic->slice_count, ctx_pic->slice));
 		// Decode frame
 		CHECK_HR_FRAME (Execute());

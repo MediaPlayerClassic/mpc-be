@@ -1,5 +1,5 @@
 /*
- * (C) 2007-2014 see Authors.txt
+ * (C) 2007-2015 see Authors.txt
  *
  * This file is part of MPC-BE.
  *
@@ -20,11 +20,6 @@
 
 #pragma once
 
-#include "../../../DSUtil/SharedInclude.h"
-#include "../../../../include/stdafx_common.h"
-#include <afxwin.h>                         // MFC core and standard components
-#include "../../../../include/stdafx_common_dshow.h"
-
-#include <dx/d3dx9.h>
-
-#pragma warning(disable:4005)
+#include "../../../../DSUtil/SharedInclude.h"
+#include <stdafx_common.h>
+#include <stdafx_common_dshow.h>

@@ -113,13 +113,13 @@ HRESULT CDXVA2DecoderHEVC::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME
 
 	// Begin frame
 	CHECK_HR_FALSE (BeginFrame(pSample));
-	// Add picture parameters
+	// Send picture parameters
 	CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_PictureParametersBufferType, sizeof(DXVA_PicParams_HEVC), &ctx_pic->pp));
-	// Add quantization matrix
+	// Send quantization matrix
 	CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_InverseQuantizationMatrixBufferType, sizeof(DXVA_Qmatrix_HEVC), &ctx_pic->qm));
-	// Add bitstream
+	// Send bitstream
 	CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_BitStreamDateBufferType));
-	// Add slice control
+	// Send slice control
 	CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_SliceControlBufferType, sizeof(DXVA_Slice_HEVC_Short) * ctx_pic->slice_count, ctx_pic->slice_short));
 
 	// Decode frame

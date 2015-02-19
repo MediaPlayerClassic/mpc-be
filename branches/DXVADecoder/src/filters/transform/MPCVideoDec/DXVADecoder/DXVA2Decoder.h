@@ -21,7 +21,6 @@
 #pragma once
 
 #include <dxva2api.h>
-#include "../../../../DSUtil/DSUtil.h"
 #include "DXVADecoder.h"
 
 #define CHECK_HR_FRAME(x)	hr = ##x; if (FAILED(hr)) { DbgLog((LOG_TRACE, 3, L"DXVA Error : 0x%08x, %s : %i", hr, CString(__FILE__), __LINE__)); CHECK_HR_FALSE (EndFrame()); return S_FALSE; }
@@ -37,7 +36,7 @@ class CDXVA2Decoder : public CDXVADecoder
 	DXVA2_DecodeExecuteParams		m_ExecuteParams;
 
 public :
-	static CDXVADecoder*			CreateDXVA2Decoder(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVA2_ConfigPictureDecode* pDXVA2Config);
+	static CDXVA2Decoder*			CreateDXVA2Decoder(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVA2_ConfigPictureDecode* pDXVA2Config);
 	virtual							~CDXVA2Decoder();
 
 	virtual HRESULT					CopyBitstream(BYTE* pDXVABuffer, UINT& nSize, UINT nDXVASize = UINT_MAX) PURE;

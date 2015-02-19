@@ -770,6 +770,10 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
 
     v->second_field = 0;
 
+    // ==> Start patch MPC
+    v->second_field_offset = 0;
+    // <== End patch MPC
+
     if(s->flags & CODEC_FLAG_LOW_DELAY)
         s->low_delay = 1;
 
@@ -1085,43 +1089,45 @@ static int vc1_decode_frame(AVCodecContext *avctx, void *data,
         }
     } else
         // ==> Start patch MPC
-        if (avctx->using_dxva && v->dxva_context) {
-            DXVA_VC1_Context* ctx = (DXVA_VC1_Context*)v->dxva_context;
+        if (avctx->using_dxva) {
+            if (v->dxva_context) {
+                DXVA_VC1_Context* ctx = (DXVA_VC1_Context*)v->dxva_context;
 
-            if (v->field_mode && buf_start_second_field) {
-                // decode first field
-                DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
+                if (v->field_mode && buf_start_second_field) {
+                    // decode first field
+                    DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
 
-                s->picture_structure = PICT_BOTTOM_FIELD - v->tff;
+                    s->picture_structure = PICT_BOTTOM_FIELD - v->tff;
 
-                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
-                dxva_fill_slice(avctx, ctx_pic, buf_start, buf_start_second_field - buf_start);
+                    dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                    dxva_fill_slice(avctx, ctx_pic, buf_start, buf_start_second_field - buf_start);
 
-                // decode second field
-                s->gb = slices[n_slices1 + 1].gb;
-                s->picture_structure = PICT_TOP_FIELD + v->tff;
-                v->second_field = 1;
-                v->pic_header_flag = 0;
-                if (ff_vc1_parse_frame_header_adv(v, &s->gb) < 0) {
-                    av_log(avctx, AV_LOG_ERROR, "parsing header for second field failed");
-                    goto err;
+                    // decode second field
+                    s->gb = slices[n_slices1 + 1].gb;
+                    s->picture_structure = PICT_TOP_FIELD + v->tff;
+                    v->second_field = 1;
+                    v->pic_header_flag = 0;
+                    if (ff_vc1_parse_frame_header_adv(v, &s->gb) < 0) {
+                        av_log(avctx, AV_LOG_ERROR, "parsing header for second field failed");
+                        goto err;
+                    }
+                    v->s.current_picture_ptr->f->pict_type = v->s.pict_type;
+
+                    ctx_pic = &ctx->ctx_pic[1];
+                    dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                    dxva_fill_slice(avctx, ctx_pic, buf_start_second_field, (buf + buf_size) - buf_start_second_field);
+
+                    ctx->frame_count = 2;
+                } else {
+                    s->picture_structure = PICT_FRAME;
+
+                    DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
+
+                    dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
+                    dxva_fill_slice(avctx, ctx_pic, buf_start, (buf + buf_size) - buf_start);
+
+                    ctx->frame_count = 1;
                 }
-                v->s.current_picture_ptr->f->pict_type = v->s.pict_type;
-
-                ctx_pic = &ctx->ctx_pic[1];
-                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
-                dxva_fill_slice(avctx, ctx_pic, buf_start_second_field, (buf + buf_size) - buf_start_second_field);
-
-                ctx->frame_count = 2;
-            } else {
-                s->picture_structure = PICT_FRAME;
-
-                DXVA_VC1_Picture_Context* ctx_pic = &ctx->ctx_pic[0];
-
-                dxva_fill_picture_parameters(avctx, v, &ctx_pic->pp);
-                dxva_fill_slice(avctx, ctx_pic, buf_start, (buf + buf_size) - buf_start);
-
-                ctx->frame_count = 1;
             }
         } else
         // <== End patch MPC
@@ -1253,6 +1259,17 @@ image:
             *got_frame = 1;
         }
     }
+
+    // ==> Start patch MPC
+    if (avctx->using_dxva) {
+        if (v->field_mode && buf_start_second_field) {
+            s->picture_structure   = PICT_BOTTOM_FIELD - v->tff;
+            v->second_field_offset = buf_start_second_field - buf;
+        } else {
+            s->picture_structure = PICT_FRAME;
+        }
+	}
+    // <== End patch MPC
 
 end:
     av_free(buf2);

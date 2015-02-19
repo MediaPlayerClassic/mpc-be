@@ -141,13 +141,13 @@ HRESULT CDXVA2DecoderH264::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME
 
 		// Begin frame
 		CHECK_HR_FALSE (BeginFrame(pSample));
-		// Add picture parameters
+		// Send picture parameters
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_PictureParametersBufferType, sizeof(DXVA_PicParams_H264), &ctx_pic->pp));
-		// Add quantization matrix
+		// Send quantization matrix
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_InverseQuantizationMatrixBufferType, sizeof(DXVA_Qmatrix_H264), &ctx_pic->qm));
-		// Add bitstream
+		// Send bitstream
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_BitStreamDateBufferType));
-		// Add slice control
+		// Send slice control
 		if (m_DXVA_Context.longslice) {
 			CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_SliceControlBufferType, sizeof(DXVA_Slice_H264_Long) * ctx_pic->slice_count, ctx_pic->slice_long));
 		} else {

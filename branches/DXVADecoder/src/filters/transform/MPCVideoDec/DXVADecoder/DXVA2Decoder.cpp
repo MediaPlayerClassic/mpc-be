@@ -38,7 +38,6 @@ CDXVA2Decoder::CDXVA2Decoder(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* 
 	, m_pDirectXVideoDec(pDirectXVideoDec)
 	, m_guidDecoder(*guidDecoder)
 	, m_pFilter(pFilter)
-
 {
 	memcpy(&m_DXVA2Config, pDXVA2Config, sizeof(DXVA2_ConfigPictureDecode));
 	memset(&m_ExecuteParams, 0, sizeof(m_ExecuteParams));
@@ -55,9 +54,9 @@ CDXVA2Decoder::~CDXVA2Decoder()
 	m_pDirectXVideoDec.Release();
 }
 
-CDXVADecoder* CDXVA2Decoder::CreateDXVA2Decoder(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVA2_ConfigPictureDecode* pDXVA2Config)
+CDXVA2Decoder* CDXVA2Decoder::CreateDXVA2Decoder(CMPCVideoDecFilter* pFilter, IDirectXVideoDecoder* pDirectXVideoDec, const GUID* guidDecoder, DXVA2_ConfigPictureDecode* pDXVA2Config)
 {
-	CDXVADecoder* pDecoder = NULL;
+	CDXVA2Decoder* pDecoder = NULL;
 
 	if ((*guidDecoder == DXVA2_ModeH264_E) || (*guidDecoder == DXVA2_ModeH264_F) || (*guidDecoder == DXVA_Intel_H264_ClearVideo)) {
 		pDecoder = DNew CDXVA2DecoderH264(pFilter, pDirectXVideoDec, guidDecoder, pDXVA2Config);

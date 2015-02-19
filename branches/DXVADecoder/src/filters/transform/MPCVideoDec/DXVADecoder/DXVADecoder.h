@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "../../../../DSUtil/DSUtil.h"
+
 #pragma warning(push)
 #pragma warning(disable: 4005)
 #include <stdint.h>

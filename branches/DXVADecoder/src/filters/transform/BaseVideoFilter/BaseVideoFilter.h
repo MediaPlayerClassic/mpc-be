@@ -37,11 +37,6 @@ struct VIDEO_OUTPUT_FORMATS {
 	}
 };
 
-enum DECODER_MODE {
-	MODE_SOFTWARE,
-	MODE_DXVA2
-};
-
 class CBaseVideoFilter : public CTransformFilter
 {
 private:
@@ -55,11 +50,16 @@ private:
 	long m_cBuffers;
 
 protected:
+
+	enum DECODER_MODE {
+		MODE_SOFTWARE,
+		MODE_DXVA1,
+		MODE_DXVA2
+	} m_nDecoderMode;
+
 	CCritSec m_csReceive;
 
 	int m_w, m_h, m_arx, m_ary;
-
-	DECODER_MODE m_nDecoderMode;
 
 	HRESULT GetDeliveryBuffer(int w, int h, IMediaSample** ppOut, REFERENCE_TIME AvgTimePerFrame = 0);
 	HRESULT CopyBuffer(BYTE* pOut, BYTE* pIn, int w, int h, int pitchIn, const GUID& subtype, bool fInterlaced = false);

@@ -21,11 +21,13 @@
 #pragma once
 
 #include <dx/d3dx9.h>
-#include <dxva2api.h>
+#include <videoacc.h>	// DXVA1
+#include <dxva2api.h>	// DXVA2
 #include "../BaseVideoFilter/BaseVideoFilter.h"
 #include "IMPCVideoDec.h"
 #include "MPCVideoDecSettingsWnd.h"
 #include "./DXVADecoder/DXVADecoder.h"
+#include "./DXVADecoder/DXVA1Decoder.h"
 #include "./DXVADecoder/DXVA2Decoder.h"
 #include "FormatConverter.h"
 #include "../../../apps/mplayerc/FilterEnum.h"
@@ -127,6 +129,9 @@ protected:
 	DWORD									m_nPCIDevice;
 	LARGE_INTEGER							m_VideoDriverVersion;
 	CString									m_strDeviceDescription;
+
+	// === DXVA1 variables
+	DDPIXELFORMAT							m_DDPixelFormat;
 
 	// === DXVA2 variables
 	CComPtr<IDirect3DDeviceManager9>		m_pDeviceManager;
@@ -247,12 +252,13 @@ public:
 	int							PictWidthRounded();
 	int							PictHeightRounded();
 
-	inline bool					UseDXVA2()		const { return (m_nDecoderMode == MODE_DXVA2); };
-	inline AVCodecContext*		GetAVCtx()		const { return m_pAVCtx; };
-	inline AVFrame*				GetFrame()		const { return m_pFrame; };
-	inline enum AVCodecID		GetCodec()		const { return m_nCodecId; };
-	inline DWORD				GetPCIVendor()	const { return m_nPCIVendor; };
-	inline DWORD				GetPCIDevice()	const { return m_nPCIDevice; };
+	inline bool					UseDXVA2()			const { return (m_nDecoderMode == MODE_DXVA2); };
+	inline AVCodecContext*		GetAVCtx()			const { return m_pAVCtx; };
+	inline AVFrame*				GetFrame()			const { return m_pFrame; };
+	inline enum AVCodecID		GetCodec()			const { return m_nCodecId; };
+	inline bool					IsReorderBFrame()	const { return m_bReorderBFrame; };
+	inline DWORD				GetPCIVendor()		const { return m_nPCIVendor; };
+	inline DWORD				GetPCIDevice()		const { return m_nPCIDevice; };
 
 	bool						IsDXVASupported();
 	void						UpdateAspectRatio();
@@ -260,6 +266,16 @@ public:
 	void						FlushDXVADecoder();
 	void						SetTypeSpecificFlags(IMediaSample* pMS);
 	void						HandleKeyFrame(int& got_picture);
+
+	// === DXVA1 functions
+	const DDPIXELFORMAT*		GetDXVA1PixelFormat() { return &m_DDPixelFormat; }
+	HRESULT						FindDXVA1DecoderConfiguration(IAMVideoAccelerator* pAMVideoAccelerator,
+															  const GUID* guidDecoder,
+															  DDPIXELFORMAT* pPixelFormat);
+	HRESULT						CheckDXVA1Decoder(const GUID *pGuid);
+	void						SetDXVA1Params(const GUID* pGuid, DDPIXELFORMAT* pPixelFormat);
+	WORD						GetDXVA1RestrictedMode();
+	HRESULT						CreateDXVA1Decoder(IAMVideoAccelerator* pAMVideoAccelerator, const GUID* pDecoderGuid, DWORD dwSurfaceCount);
 
 
 	// === DXVA2 functions
@@ -290,6 +306,7 @@ private:
 };
 
 class CVideoDecOutputPin : public CBaseVideoOutputPin
+	, public IAMVideoAcceleratorNotify
 {
 public:
 	CVideoDecOutputPin(TCHAR* pObjectName, CBaseVideoFilter* pFilter, HRESULT* phr, LPCWSTR pName);
@@ -300,8 +317,16 @@ public:
 	DECLARE_IUNKNOWN
 	STDMETHODIMP		NonDelegatingQueryInterface(REFIID riid, void** ppv);
 
+	// IAMVideoAcceleratorNotify
+	STDMETHODIMP		GetUncompSurfacesInfo(const GUID *pGuid, LPAMVAUncompBufferInfo pUncompBufferInfo);
+	STDMETHODIMP		SetUncompSurfacesInfo(DWORD dwActualUncompSurfacesAllocated);
+	STDMETHODIMP		GetCreateVideoAcceleratorData(const GUID *pGuid, LPDWORD pdwSizeMiscData, LPVOID *ppMiscData);
+
 private :
 	CMPCVideoDecFilter*	m_pVideoDecFilter;
+	DWORD				m_dwDXVA1SurfaceCount;
+	GUID				m_GuidDecoderDXVA1;
+	DDPIXELFORMAT		m_ddUncompPixelFormat;
 };
 
 struct SUPPORTED_FORMATS {

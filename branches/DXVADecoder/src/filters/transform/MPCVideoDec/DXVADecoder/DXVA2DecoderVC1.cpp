@@ -114,11 +114,11 @@ HRESULT CDXVA2DecoderVC1::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME 
 
 		// Begin frame
 		CHECK_HR_FALSE (BeginFrame(pSample));
-		// Add picture parameters
+		// Send picture parameters
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_PictureParametersBufferType, sizeof(DXVA_PictureParameters), &ctx_pic->pp));
-		// Add bitstream
+		// Send bitstream
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_BitStreamDateBufferType));
-		// Add slice control
+		// Send slice control
 		CHECK_HR_FRAME (AddExecuteBuffer(DXVA2_SliceControlBufferType, sizeof(DXVA_SliceInfo), &ctx_pic->slice));
 		// Decode frame
 		CHECK_HR_FRAME (Execute());

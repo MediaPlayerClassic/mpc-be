@@ -47,31 +47,30 @@
 #include "vdpau_internal.h"
 #include "xvmc_internal.h"
 
-typedef struct Mpeg1Context {
-    MpegEncContext mpeg_enc_ctx;
-    int mpeg_enc_ctx_allocated; /* true if decoding context allocated */
-    int repeat_field;           /* true if we must repeat the field */
-    AVPanScan pan_scan;         /* some temporary storage for the panscan */
-    AVStereo3D stereo3d;
-    int has_stereo3d;
-    uint8_t *a53_caption;
-    int a53_caption_size;
-    uint8_t afd;
-    int has_afd;
-    int slice_count;
-    AVRational save_aspect;
-    int save_width, save_height, save_progressive_seq;
-    AVRational frame_rate_ext;  /* MPEG-2 specific framerate modificator */
-    int sync;                   /* Did we reach a sync point like a GOP/SEQ/KEYFrame? */
-    int tmpgexs;
-    int first_slice;
-    // ==> Start patch MPC
-    // int extradata_decoded;
-    // ==> End patch MPC
-} Mpeg1Context;
+// ==> Start patch MPC
+//typedef struct Mpeg1Context {
+//    MpegEncContext mpeg_enc_ctx;
+//    int mpeg_enc_ctx_allocated; /* true if decoding context allocated */
+//    int repeat_field;           /* true if we must repeat the field */
+//    AVPanScan pan_scan;         /* some temporary storage for the panscan */
+//    AVStereo3D stereo3d;
+//    int has_stereo3d;
+//    uint8_t *a53_caption;
+//    int a53_caption_size;
+//    uint8_t afd;
+//    int has_afd;
+//    int slice_count;
+//    AVRational save_aspect;
+//    int save_width, save_height, save_progressive_seq;
+//    AVRational frame_rate_ext;  /* MPEG-2 specific framerate modificator */
+//    int sync;                   /* Did we reach a sync point like a GOP/SEQ/KEYFrame? */
+//    int tmpgexs;
+//    int first_slice;
+//    int extradata_decoded;
+//} Mpeg1Context;
+// ==> End patch MPC
 
 // ==> Start patch MPC
-#include <windows.h>
 #include "dxva_mpeg2.h"
 
 static void fill_picture_parameters(AVCodecContext *avctx,
@@ -1988,21 +1987,65 @@ static int mpeg_decode_slice(MpegEncContext *s, int mb_y,
     }
 
     // ==> Start patch MPC
-    if (avctx->using_dxva && s->dxva_context) {
-        DXVA_MPEG2_Context* ctx = (DXVA_MPEG2_Context*)s->dxva_context;
-        if (ctx->frame_count <= 2) {
-            DXVA_MPEG2_Picture_Context* ctx_pic = &ctx->ctx_pic[ctx->frame_count - 1];
+    if (avctx->using_dxva) {
+        if (s->dxva_context) {
+            DXVA_MPEG2_Context* ctx = (DXVA_MPEG2_Context*)s->dxva_context;
+            if (ctx->frame_count <= 2) {
+                DXVA_MPEG2_Picture_Context* ctx_pic = &ctx->ctx_pic[ctx->frame_count - 1];
+                const uint8_t *buf_end, *buf_start = *buf - 4; /* include start_code */
+                int start_code = -1;
+                buf_end = avpriv_find_start_code(buf_start + 2, *buf + buf_size, &start_code);
+                if (buf_end < *buf + buf_size)
+                    buf_end -= 4;
+                s->mb_y = mb_y;
+    		    if (dxva_decode_slice(avctx, ctx, ctx_pic, buf_start, buf_end - buf_start) < 0)
+                    return DECODE_SLICE_ERROR;
+                *buf = buf_end;
+    		}
+            return DECODE_SLICE_OK;
+        } else {
+            Mpeg1Context *s1 = (Mpeg1Context*)s;
             const uint8_t *buf_end, *buf_start = *buf - 4; /* include start_code */
+            const uint8_t *buffer;
+            uint32_t size;
             int start_code = -1;
+            int is_field = s->picture_structure != PICT_FRAME;
+            GetBitContext gb;
+
             buf_end = avpriv_find_start_code(buf_start + 2, *buf + buf_size, &start_code);
             if (buf_end < *buf + buf_size)
                 buf_end -= 4;
             s->mb_y = mb_y;
-		    if (dxva_decode_slice(avctx, ctx, ctx_pic, buf_start, buf_end - buf_start) < 0)
-                return DECODE_SLICE_ERROR;
+
+            buffer = buf_start;
+            size = buf_end - buf_start;
+
+            s1->pSliceInfo[s1->slice_count].wHorizontalPosition = s->mb_x;
+            s1->pSliceInfo[s1->slice_count].wVerticalPosition   = s->mb_y >> is_field;
+            s1->pSliceInfo[s1->slice_count].dwSliceBitsInBuffer = 8 * size;
+            s1->pSliceInfo[s1->slice_count].bStartCodeBitOffset = 0;
+            s1->pSliceInfo[s1->slice_count].bReservedBits       = 0;
+            s1->pSliceInfo[s1->slice_count].wNumberMBsInSlice   = (s->mb_y >> is_field) * s->mb_width + s->mb_x;//s->mb_width;
+            s1->pSliceInfo[s1->slice_count].wBadSliceChopping   = 0;
+
+            init_get_bits(&gb, &buffer[4], 8 * (size - 4));
+            s1->pSliceInfo[s1->slice_count].wQuantizerScaleCode = get_bits(&gb, 5);
+            while (get_bits1(&gb))
+                skip_bits(&gb, 8);
+
+            s1->pSliceInfo[s1->slice_count].wMBbitOffset = 4 * 8 + get_bits_count(&gb);
+            if (s1->slice_count>0) {
+                s1->pSliceInfo[s1->slice_count-1].dwSliceBitsInBuffer = (buffer - s1->prev_slice)*8;
+                s1->pSliceInfo[s1->slice_count].dwSliceDataLocation   = s1->pSliceInfo[s1->slice_count-1].dwSliceDataLocation +
+                                                                    s1->pSliceInfo[s1->slice_count-1].dwSliceBitsInBuffer/8;
+            }
+
+            s1->prev_slice = (uint8_t*)buffer;
+            s1->slice_count++;
+
             *buf = buf_end;
-		}
-        return DECODE_SLICE_OK;
+            return DECODE_SLICE_OK;
+        }
     }
     // <== End patch MPC
 
