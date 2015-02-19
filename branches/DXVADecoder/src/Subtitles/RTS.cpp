@@ -205,13 +205,12 @@ bool CWord::CreateOpaqueBox()
 
 	STSStyle style = m_style;
 	style.borderStyle = 0;
-	style.outlineWidthX = style.outlineWidthY = 0.0;
-	style.fontScaleX = style.fontScaleY = 100.0;
+	style.outlineWidthX = style.outlineWidthY = 0;
 	style.colors[0] = m_style.colors[2];
 	style.alpha[0] = m_style.alpha[2];
 
-	int w = std::lround(m_style.outlineWidthX);
-	int h = std::lround(m_style.outlineWidthY);
+	int w = (int)(m_style.outlineWidthX + 0.5);
+	int h = (int)(m_style.outlineWidthY + 0.5);
 
 	// Convert to pixels rounding to nearest
 	CStringW str;
@@ -2650,23 +2649,26 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
 		}
 	}
 
-	double dFontScaleXCompensation = 1.0;
-	double dFontScaleYCompensation = 1.0;
-
 	if (m_ePARCompensationType == EPCTUpscale) {
-	    if (m_dPARCompensation < 1.0) {
-	        dFontScaleYCompensation = 1.0 / m_dPARCompensation;
-	    } else {
-	        dFontScaleXCompensation = m_dPARCompensation;
-	    }
+		if (stss.fontScaleX / stss.fontScaleY == 1.0 && m_dPARCompensation != 1.0) {
+			if (m_dPARCompensation < 1.0) {
+				stss.fontScaleY /= m_dPARCompensation;
+			} else {
+				stss.fontScaleX *= m_dPARCompensation;
+			}
+		}
 	} else if (m_ePARCompensationType == EPCTDownscale) {
-	    if (m_dPARCompensation < 1.0) {
-	        dFontScaleXCompensation = m_dPARCompensation;
-	    } else {
-	        dFontScaleYCompensation = 1.0 / m_dPARCompensation;
-	    }
+		if (stss.fontScaleX / stss.fontScaleY == 1.0 && m_dPARCompensation != 1.0) {
+			if (m_dPARCompensation < 1.0) {
+				stss.fontScaleX *= m_dPARCompensation;
+			} else {
+				stss.fontScaleY /= m_dPARCompensation;
+			}
+		}
 	} else if (m_ePARCompensationType == EPCTAccurateSize) {
-	    dFontScaleXCompensation = m_dPARCompensation;
+		if (stss.fontScaleX / stss.fontScaleY == 1.0 && m_dPARCompensation != 1.0) {
+			stss.fontScaleX *= m_dPARCompensation;
+		}
 	}
 
 	orgstss = stss;
@@ -2738,9 +2740,6 @@ CSubtitle* CRenderedTextSubtitle::GetSubtitle(int entry)
 		tmp.outlineWidthY	*= (m_fScaledBAS ? sub->m_scaley : 1.0) * 8.0;
 		tmp.shadowDepthX	*= (m_fScaledBAS ? sub->m_scalex : 1.0) * 8.0;
 		tmp.shadowDepthY	*= (m_fScaledBAS ? sub->m_scaley : 1.0) * 8.0;
-		
-		tmp.fontScaleX *= dFontScaleXCompensation;
-		tmp.fontScaleY *= dFontScaleYCompensation;
 
 		if (m_nPolygon) {
 			ParsePolygon(sub, str.Left(i), tmp);
