@@ -22,7 +22,6 @@
 #include "DXVA1DecoderMPEG2.h"
 #include "../MPCVideoDec.h"
 #include "../FfmpegContext.h"
-#include "FfmpegContext_DXVA1.h"
 #include <ffmpeg/libavcodec/avcodec.h>
 
 #if 0
@@ -34,149 +33,11 @@
 CDXVA1DecoderMPEG2::CDXVA1DecoderMPEG2(CMPCVideoDecFilter* pFilter, IAMVideoAccelerator*  pAMVideoAccelerator, int nPicEntryNumber)
 	: CDXVA1Decoder(pFilter, pAMVideoAccelerator, nPicEntryNumber)
 {
-	memset(&m_PictureParams, 0, sizeof(m_PictureParams));
-	memset(&m_SliceInfo, 0, sizeof(m_SliceInfo));
-	memset(&m_QMatrixData, 0, sizeof(m_QMatrixData));
+	memset(&m_DXVA_Context, 0, sizeof(m_DXVA_Context));
 
-	m_PictureParams.bMacroblockWidthMinus1	= 15;
-	m_PictureParams.bMacroblockHeightMinus1	= 15;
-	m_PictureParams.bBlockWidthMinus1		= 7;
-	m_PictureParams.bBlockHeightMinus1		= 7;
-	m_PictureParams.bBPPminus1				= 7;
-	m_PictureParams.bChromaFormat			= 1;
-
-	m_nMaxWaiting			= 5;
-	m_nSliceCount			= 0;
+	FFMPEG2SetDxvaParams(m_pFilter->GetAVCtx(), &m_DXVA_Context);
 
 	Flush();
-}
-
-static CString FrameType(bool bIsField, BYTE bSecondField)
-{
-	CString str;
-	if (bIsField) {
-		str.Format(L"Field [%d]", bSecondField);
-	} else {
-		str = L"Frame";
-	}
-
-	return str;
-}
-
-HRESULT CDXVA1DecoderMPEG2::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop)
-{
-	HRESULT	hr				= S_FALSE;
-	int		nSurfaceIndex	= -1;
-	bool	bIsField		= false;
-
-	CHECK_HR_FALSE (FFMpeg2DecodeFrame(&m_PictureParams, &m_QMatrixData, m_SliceInfo,
-									   m_pFilter->GetAVCtx(), m_pFilter->GetFrame(), pDataIn, nSize,
-									   &m_nSliceCount, &m_nNextCodecIndex,
-									   &bIsField));
-
-	// Wait I frame after a flush
-	if (m_bFlushed && (!m_PictureParams.bPicIntra || (bIsField && m_PictureParams.bSecondField))) {
-		TRACE_MPEG2 ("CDXVA1DecoderMPEG2::DecodeFrame() : Flush - wait I frame, %s\n", FrameType(bIsField, m_PictureParams.bSecondField));
-		return S_FALSE;
-	}
-
-	CHECK_HR_FALSE (GetFreeSurfaceIndex(nSurfaceIndex));
-
-	if (!bIsField || (bIsField && !m_PictureParams.bSecondField)) {
-		UpdatePictureParams(nSurfaceIndex);	
-	}
-
-	TRACE_MPEG2 ("CDXVA1DecoderMPEG2::DecodeFrame() : Surf = %d, %ws, m_nNextCodecIndex = %d, rtStart = [%I64d]\n",
-				 nSurfaceIndex, FrameType(bIsField, m_PictureParams.bSecondField), m_nNextCodecIndex, rtStart);
-
-	// Begin frame
-	CHECK_HR_FALSE (BeginFrame(nSurfaceIndex));
-	// Send picture parameters
-	CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_PICTURE_DECODE_BUFFER, sizeof(DXVA_PictureParameters), &m_PictureParams));
-	// Send quantization matrix
-	CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_INVERSE_QUANTIZATION_MATRIX_BUFFER, sizeof(DXVA_QmatrixData), &m_QMatrixData));
-	// Send bitstream
-	CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_BITSTREAM_DATA_BUFFER, nSize, pDataIn, &nSize));
-	// Send slice control
-	CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_SLICE_CONTROL_BUFFER, sizeof(DXVA_SliceInfo) * m_nSliceCount, &m_SliceInfo));
-	// Decode frame
-	CHECK_HR_FRAME_DXVA1 (Execute());
-	CHECK_HR_FALSE (EndFrame(nSurfaceIndex));
-
-	bool bAdded = AddToStore(nSurfaceIndex, (m_PictureParams.bPicBackwardPrediction != 1),
-							 rtStart, rtStop,
-							 bIsField, FFGetCodedPicture(m_pFilter->GetAVCtx()));
-
-	if (bAdded) {
-		hr = DisplayNextFrame();
-	}
-		
-	m_bFlushed = false;
-	return hr;
-}
-
-void CDXVA1DecoderMPEG2::UpdatePictureParams(int nSurfaceIndex)
-{
-	DXVA_ConfigPictureDecode* cpd = &m_DXVA1Config;
-
-	m_PictureParams.wDecodedPictureIndex = nSurfaceIndex;
-
-	// Manage reference picture list
-	if (!m_PictureParams.bPicBackwardPrediction) {
-		if (m_wRefPictureIndex[0] != NO_REF_FRAME) {
-			RemoveRefFrame (m_wRefPictureIndex[0]);
-		}
-		m_wRefPictureIndex[0] = m_wRefPictureIndex[1];
-		m_wRefPictureIndex[1] = nSurfaceIndex;
-	}
-	m_PictureParams.wForwardRefPictureIndex		= (m_PictureParams.bPicIntra == 0)				? m_wRefPictureIndex[0] : NO_REF_FRAME;
-	m_PictureParams.wBackwardRefPictureIndex	= (m_PictureParams.bPicBackwardPrediction == 1) ? m_wRefPictureIndex[1] : NO_REF_FRAME;
-
-	// Shall be 0 if bConfigResidDiffHost is 0 or if BPP > 8
-	if (cpd->bConfigResidDiffHost == 0 || m_PictureParams.bBPPminus1 > 7) {
-		m_PictureParams.bPicSpatialResid8 = 0;
-	} else {
-		if (m_PictureParams.bBPPminus1 == 7 && m_PictureParams.bPicIntra && cpd->bConfigResidDiffHost) {
-			// Shall be 1 if BPP is 8 and bPicIntra is 1 and bConfigResidDiffHost is 1
-			m_PictureParams.bPicSpatialResid8 = 1;
-		} else {
-			// Shall be 1 if bConfigSpatialResid8 is 1
-			m_PictureParams.bPicSpatialResid8 = cpd->bConfigSpatialResid8;
-		}
-	}
-
-	// Shall be 0 if bConfigResidDiffHost is 0 or if bConfigSpatialResid8 is 0 or if BPP > 8
-	if (cpd->bConfigResidDiffHost == 0 || cpd->bConfigSpatialResid8 == 0 || m_PictureParams.bBPPminus1 > 7) {
-		m_PictureParams.bPicOverflowBlocks = 0;
-	}
-
-	// Shall be 1 if bConfigHostInverseScan is 1 or if bConfigResidDiffAccelerator is 0.
-
-	if (cpd->bConfigHostInverseScan == 1 || cpd->bConfigResidDiffAccelerator == 0) {
-		m_PictureParams.bPicScanFixed	= 1;
-
-		if (cpd->bConfigHostInverseScan != 0) {
-			m_PictureParams.bPicScanMethod	= 3;    // 11 = Arbitrary scan with absolute coefficient address.
-		} else if (FFGetAlternateScan(m_pFilter->GetAVCtx())) {
-			m_PictureParams.bPicScanMethod	= 1;    // 00 = Zig-zag scan (MPEG-2 Figure 7-2)
-		} else {
-			m_PictureParams.bPicScanMethod	= 0;    // 01 = Alternate-vertical (MPEG-2 Figure 7-3),
-		}
-	}
-}
-
-void CDXVA1DecoderMPEG2::CopyBitstream(BYTE* pDXVABuffer, BYTE* pBuffer, UINT& nSize)
-{
-	while (*((DWORD*)pBuffer) != 0x01010000) {
-		pBuffer++;
-		nSize--;
-
-		if (nSize == 0) {
-			return;
-		}
-	}
-
-	memcpy(pDXVABuffer, pBuffer, nSize);
 }
 
 void CDXVA1DecoderMPEG2::Flush()
@@ -187,6 +48,145 @@ void CDXVA1DecoderMPEG2::Flush()
 	m_wRefPictureIndex[1]	= NO_REF_FRAME;
 
 	__super::Flush();
+}
+
+void CDXVA1DecoderMPEG2::CopyBitstream(BYTE* pDXVABuffer, BYTE* pBuffer, UINT& nSize)
+{
+	DXVA_MPEG2_Picture_Context *ctx_pic	= &m_DXVA_Context.ctx_pic[m_nFieldNum];
+	BYTE* current						= pDXVABuffer;
+	UINT MBCount						= FFGetMBCount(m_pFilter->GetAVCtx());
+
+	for (unsigned i = 0; i < ctx_pic->slice_count; i++) {
+		DXVA_SliceInfo *slice	= &ctx_pic->slice[i];
+		UINT position			= slice->dwSliceDataLocation;
+		UINT size				= slice->dwSliceBitsInBuffer / 8;
+
+		slice->dwSliceDataLocation = current - pDXVABuffer;
+
+		if (i < ctx_pic->slice_count - 1) {
+			slice->wNumberMBsInSlice =
+				slice[1].wNumberMBsInSlice - slice[0].wNumberMBsInSlice;
+		} else {
+			slice->wNumberMBsInSlice =
+				MBCount - slice[0].wNumberMBsInSlice;
+		}
+
+		memcpy(current, &ctx_pic->bitstream[position], size);
+		current += size;
+	}
+
+	nSize = current - pDXVABuffer;
+}
+
+HRESULT CDXVA1DecoderMPEG2::DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop)
+{
+	HRESULT	hr				= S_FALSE;
+	int		got_picture		= 0;
+	int		nSurfaceIndex	= -1;
+
+	AVFrame* pFrame;
+	memset(&m_DXVA_Context, 0, sizeof(m_DXVA_Context));
+	CHECK_HR_FALSE (FFDecodeFrame(m_pFilter->GetAVCtx(), m_pFilter->GetFrame(),
+								  pDataIn, nSize, rtStart, rtStop,
+								  &got_picture, &pFrame));
+
+	if (!pFrame || !m_DXVA_Context.ctx_pic[0].slice_count) {
+		return S_FALSE;
+	}
+
+	// Wait I frame after a flush
+	if (m_bFlushed && !m_DXVA_Context.ctx_pic[0].pp.bPicIntra) {
+		TRACE_MPEG2 ("CDXVA1DecoderMPEG2::DecodeFrame() : Flush - wait I frame\n");
+		return S_FALSE;
+	}
+
+	if (got_picture) {
+		m_nNextCodecIndex = m_pFilter->GetFrame()->coded_picture_number;
+	}
+
+	CHECK_HR_FALSE (GetFreeSurfaceIndex(nSurfaceIndex));
+
+	for (UINT i = 0; i < m_DXVA_Context.frame_count; i++) {
+		DXVA_MPEG2_Picture_Context* ctx_pic = &m_DXVA_Context.ctx_pic[i];
+
+		if (!ctx_pic->slice_count) {
+			continue;
+		}
+
+		m_nFieldNum = i;
+		UpdatePictureParams(nSurfaceIndex);
+
+		// Begin frame
+		CHECK_HR_FALSE (BeginFrame(nSurfaceIndex));
+		// Send picture parameters
+		CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_PICTURE_DECODE_BUFFER, sizeof(DXVA_PictureParameters), &ctx_pic->pp));
+		// Send quantization matrix
+		CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_INVERSE_QUANTIZATION_MATRIX_BUFFER, sizeof(DXVA_QmatrixData), &ctx_pic->qm));
+		// Send bitstream
+		CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_BITSTREAM_DATA_BUFFER));
+		// Send slice control
+		CHECK_HR_FRAME_DXVA1 (AddExecuteBuffer(DXVA_SLICE_CONTROL_BUFFER, sizeof(DXVA_SliceInfo) * ctx_pic->slice_count, ctx_pic->slice));
+		// Decode frame
+		CHECK_HR_FRAME_DXVA1 (Execute());
+		CHECK_HR_FALSE (EndFrame(nSurfaceIndex));
+	}
+
+	AddToStore(nSurfaceIndex, m_DXVA_Context.ctx_pic[0].pp.bPicBackwardPrediction != 1,
+			   rtStart, rtStop,
+			   false, pFrame->coded_picture_number);
+
+	m_bFlushed = false;
+	return DisplayNextFrame();
+}
+
+void CDXVA1DecoderMPEG2::UpdatePictureParams(int nSurfaceIndex)
+{
+	DXVA_ConfigPictureDecode* cpd			= &m_DXVA1Config;
+	DXVA_PictureParameters* DXVAPicParams	= &m_DXVA_Context.ctx_pic[m_nFieldNum].pp;
+
+	DXVAPicParams->wDecodedPictureIndex = nSurfaceIndex;
+
+	// Manage reference picture list
+	if (!DXVAPicParams->bPicBackwardPrediction && m_nFieldNum == 0) {
+		if (m_wRefPictureIndex[0] != NO_REF_FRAME) {
+			RemoveRefFrame(m_wRefPictureIndex[0]);
+		}
+		m_wRefPictureIndex[0] = m_wRefPictureIndex[1];
+		m_wRefPictureIndex[1] = nSurfaceIndex;
+	}
+	DXVAPicParams->wForwardRefPictureIndex	= (DXVAPicParams->bPicIntra == 0)			   ? m_wRefPictureIndex[0] : NO_REF_FRAME;
+	DXVAPicParams->wBackwardRefPictureIndex	= (DXVAPicParams->bPicBackwardPrediction == 1) ? m_wRefPictureIndex[1] : NO_REF_FRAME;
+
+	// Shall be 0 if bConfigResidDiffHost is 0 or if BPP > 8
+	if (cpd->bConfigResidDiffHost == 0 || DXVAPicParams->bBPPminus1 > 7) {
+		DXVAPicParams->bPicSpatialResid8 = 0;
+	} else {
+		if (DXVAPicParams->bBPPminus1 == 7 && DXVAPicParams->bPicIntra && cpd->bConfigResidDiffHost) {
+			// Shall be 1 if BPP is 8 and bPicIntra is 1 and bConfigResidDiffHost is 1
+			DXVAPicParams->bPicSpatialResid8 = 1;
+		} else {
+			// Shall be 1 if bConfigSpatialResid8 is 1
+			DXVAPicParams->bPicSpatialResid8 = cpd->bConfigSpatialResid8;
+		}
+	}
+
+	// Shall be 0 if bConfigResidDiffHost is 0 or if bConfigSpatialResid8 is 0 or if BPP > 8
+	if (cpd->bConfigResidDiffHost == 0 || cpd->bConfigSpatialResid8 == 0 || DXVAPicParams->bBPPminus1 > 7) {
+		DXVAPicParams->bPicOverflowBlocks = 0;
+	}
+
+	// Shall be 1 if bConfigHostInverseScan is 1 or if bConfigResidDiffAccelerator is 0.
+	if (cpd->bConfigHostInverseScan == 1 || cpd->bConfigResidDiffAccelerator == 0) {
+		DXVAPicParams->bPicScanFixed = 1;
+
+		if (cpd->bConfigHostInverseScan != 0) {
+			DXVAPicParams->bPicScanMethod	= 3;    // 11 = Arbitrary scan with absolute coefficient address.
+		} else if (FFGetAlternateScan(m_pFilter->GetAVCtx())) {
+			DXVAPicParams->bPicScanMethod	= 1;    // 00 = Zig-zag scan (MPEG-2 Figure 7-2)
+		} else {
+			DXVAPicParams->bPicScanMethod	= 0;    // 01 = Alternate-vertical (MPEG-2 Figure 7-3),
+		}
+	}
 }
 
 int CDXVA1DecoderMPEG2::FindOldestFrame()

@@ -42,10 +42,3 @@ void			FFH264SetDxvaSliceLong(struct AVCodecContext* pAVCtx, void* pSliceLong);
 HRESULT			FFVC1DecodeFrame(DXVA_PictureParameters* pPicParams, struct AVCodecContext* pAVCtx, struct AVFrame* pFrame, REFERENCE_TIME rtStart,
 								 BYTE* pBuffer, UINT nSize,
 								 UINT* nFrameSize, BOOL b_SecondField);
-// === Mpeg2 functions
-HRESULT			FFMpeg2DecodeFrame(DXVA_PictureParameters* pPicParams, DXVA_QmatrixData* m_QMatrixData, DXVA_SliceInfo* pSliceInfo,
-									struct AVCodecContext* pAVCtx, struct AVFrame* pFrame, BYTE* pBuffer, UINT nSize,
-									int* nSliceCount, int* nNextCodecIndex, bool* bIsField);
-
-// === Common functions
-int				FFGetCodedPicture(struct AVCodecContext* pAVCtx);

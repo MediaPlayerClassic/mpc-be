@@ -21,29 +21,26 @@
 #pragma once
 
 #include "DXVA1Decoder.h"
+#include <ffmpeg/libavcodec/dxva_mpeg2.h>
 
 class CDXVA1DecoderMPEG2 : public CDXVA1Decoder
 {
-	#define MAX_SLICE		1024 // Max slice number for Mpeg2 streams
+	DXVA_MPEG2_Context	m_DXVA_Context;
+	UINT				m_nFieldNum;
+
+	WORD				m_wRefPictureIndex[2];
+	int					m_nNextCodecIndex;
+
+	void				UpdatePictureParams(int nSurfaceIndex);
+
 public:
 	CDXVA1DecoderMPEG2(CMPCVideoDecFilter* pFilter, IAMVideoAccelerator*  pAMVideoAccelerator, int nPicEntryNumber);
 
 	// === Public functions
-	virtual HRESULT 		DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop);
-	virtual void			CopyBitstream(BYTE* pDXVABuffer, BYTE* pBuffer, UINT& nSize);
-	virtual void			Flush();
+	virtual HRESULT		DecodeFrame(BYTE* pDataIn, UINT nSize, REFERENCE_TIME rtStart, REFERENCE_TIME rtStop);
+	virtual void		CopyBitstream(BYTE* pDXVABuffer, BYTE* pBuffer, UINT& nSize);
+	virtual void		Flush();
 
 protected :
-	virtual int				FindOldestFrame();
-
-private:
-	DXVA_PictureParameters	m_PictureParams;
-	DXVA_QmatrixData		m_QMatrixData;
-	WORD					m_wRefPictureIndex[2];
-	DXVA_SliceInfo			m_SliceInfo[MAX_SLICE];
-	int						m_nSliceCount;
-
-	int						m_nNextCodecIndex;
-
-	void					UpdatePictureParams(int nSurfaceIndex);
+	virtual int			FindOldestFrame();
 };

@@ -33,36 +33,6 @@
 #define MB_PTYPE_VLC_BITS 6
 #define MB_BTYPE_VLC_BITS 6
 
-// ==> Start patch MPC
-#include "libavutil/stereo3d.h"
-#include <windows.h>
-#include <dxva.h>
-
-typedef struct Mpeg1Context {
-    MpegEncContext mpeg_enc_ctx;
-    int mpeg_enc_ctx_allocated; /* true if decoding context allocated */
-    int repeat_field;           /* true if we must repeat the field */
-    AVPanScan pan_scan;         /* some temporary storage for the panscan */
-    AVStereo3D stereo3d;
-    int has_stereo3d;
-    uint8_t *a53_caption;
-    int a53_caption_size;
-    uint8_t afd;
-    int has_afd;
-    int slice_count;
-    AVRational save_aspect;
-    int save_width, save_height, save_progressive_seq;
-    AVRational frame_rate_ext;  /* MPEG-2 specific framerate modificator */
-    int sync;                   /* Did we reach a sync point like a GOP/SEQ/KEYFrame? */
-    int tmpgexs;
-    int first_slice;
-    //int extradata_decoded;
-
-    DXVA_SliceInfo* pSliceInfo;
-    uint8_t* prev_slice;
-} Mpeg1Context;
-// ==> End patch MPC
-
 extern VLC ff_dc_lum_vlc;
 extern VLC ff_dc_chroma_vlc;
 extern VLC ff_mbincr_vlc;
