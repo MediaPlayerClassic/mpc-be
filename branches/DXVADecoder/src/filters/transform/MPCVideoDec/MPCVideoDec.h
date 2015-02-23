@@ -155,6 +155,8 @@ protected:
 
 	BOOL									m_bDecodingStart;
 
+	BOOL									m_bHEVC10bit;
+
 	// === Private functions
 	void				Cleanup();
 	void				ffmpegCleanup();
