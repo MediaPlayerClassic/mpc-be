@@ -257,6 +257,11 @@ class CMainFrame : public CFrameWnd, public CDropTarget
 	CComPtr<IAMLine21Decoder_2>     m_pLN21;
 	CComPtr<IVMRWindowlessControl9> m_pVMRWC;
 
+	CComPtr<IVMRMixerBitmap9>		m_pVMB;
+	CComPtr<IMFVideoMixerBitmap>	m_pMFVMB;
+	CComPtr<IMadVRTextOsd>			m_pMVTO;
+
+
 	CComPtr<ISubPicAllocatorPresenter>  m_pCAP;
 	CComPtr<ISubPicAllocatorPresenter2> m_pCAP2;
 

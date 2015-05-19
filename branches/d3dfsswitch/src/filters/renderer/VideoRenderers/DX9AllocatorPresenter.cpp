@@ -1207,9 +1207,11 @@ bool CDX9AllocatorPresenter::WaitForVBlank(bool &_Waited, bool &_bTakenLock)
 void CDX9AllocatorPresenter::UpdateAlphaBitmap()
 {
 	m_VMR9AlphaBitmapData.Free();
+	m_pOSDTexture.Release();
+	m_pOSDSurface.Release();
 
 	if ((m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_DISABLE) == 0) {
-		HBITMAP hBitmap = (HBITMAP)GetCurrentObject (m_VMR9AlphaBitmap.hdc, OBJ_BITMAP);
+		HBITMAP hBitmap = (HBITMAP)GetCurrentObject(m_VMR9AlphaBitmap.hdc, OBJ_BITMAP);
 		if (!hBitmap) {
 			return;
 		}
@@ -1316,9 +1318,11 @@ STDMETHODIMP_(bool) CDX9AllocatorPresenter::Paint(bool fAll)
 	// Casimir666 : show OSD
 	if (m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_UPDATE) {
 		CAutoLock BitMapLock(&m_VMR9AlphaBitmapLock);
-		CRect rcSrc(m_VMR9AlphaBitmap.rSrc);
+		
 		m_pOSDTexture.Release();
 		m_pOSDSurface.Release();
+
+		CRect rcSrc(m_VMR9AlphaBitmap.rSrc);
 		if ((m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_DISABLE) == 0 && (BYTE *)m_VMR9AlphaBitmapData) {
 			if ((m_pD3DXLoadSurfaceFromMemory != NULL) &&
 					SUCCEEDED(hr = m_pD3DDev->CreateTexture(rcSrc.Width(), rcSrc.Height(), 1,

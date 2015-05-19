@@ -306,6 +306,10 @@ void COSD::Start(CWnd* pWnd)
 
 void COSD::Stop()
 {
+	if (m_pWnd) {
+		m_pWnd->KillTimer((UINT_PTR)this);
+	}
+
 	m_bCursorMoving			= false;
 	m_bSeekBarVisible		= false;
 	m_bFlyBarVisible		= false;
@@ -317,11 +321,7 @@ void COSD::Stop()
 	m_pVMB.Release();
 	m_pMFVMB.Release();
 	m_pMVTO.Release();
-
-	if (m_pWnd) {
-		m_pWnd->KillTimer((UINT_PTR)this);
-		m_pWnd = NULL;
-	}
+	m_pWnd = NULL;
 
 	Reset();
 }
@@ -528,7 +528,7 @@ void COSD::InvalidateVMROSD()
 {
 	CAutoLock Lock(&m_Lock);
 
-	if (m_BitmapInfo.bmWidth * m_BitmapInfo.bmHeight * (m_BitmapInfo.bmBitsPixel >> 3) == 0) {
+	if (!m_BitmapInfo.bmWidth || !m_BitmapInfo.bmHeight || !m_BitmapInfo.bmBitsPixel) {
 		return;
 	}
 
@@ -556,7 +556,7 @@ void COSD::InvalidateVMROSD()
 
 void COSD::UpdateSeekBarPos(CPoint point)
 {
-	m_llSeekPos = (point.x - m_rectBar.left) * (m_llSeekMax-m_llSeekMin) / (m_rectBar.Width() - SLIDER_CURSOR_WIDTH);
+	m_llSeekPos = (point.x - m_rectBar.left) * (m_llSeekMax - m_llSeekMin) / (m_rectBar.Width() - SLIDER_CURSOR_WIDTH);
 	m_llSeekPos = max (m_llSeekPos, m_llSeekMin);
 	m_llSeekPos = min (m_llSeekPos, m_llSeekMax);
 
