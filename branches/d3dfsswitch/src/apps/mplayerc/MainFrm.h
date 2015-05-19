@@ -258,7 +258,6 @@ class CMainFrame : public CFrameWnd, public CDropTarget
 	CComPtr<IVMRWindowlessControl9> m_pVMRWC;
 
 	CComPtr<IVMRMixerBitmap9>		m_pVMB;
-	CComPtr<IMFVideoMixerBitmap>	m_pMFVMB;
 	CComPtr<IMadVRTextOsd>			m_pMVTO;
 
 

@@ -10554,8 +10554,6 @@ void CMainFrame::ToggleD3DFullscreen(bool fSwitchScreenResWhenHasTo)
 			if (s.fShowOSD || s.fShowDebugInfo) {
 				if (m_pVMB) {
 					m_OSD.Start(m_pVideoWnd, m_pVMB);
-				} else if (m_pMFVMB) {
-					m_OSD.Start(m_pVideoWnd, m_pMFVMB);
 				}
 			}
 
@@ -13572,8 +13570,7 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMRMC9), TRUE);
 		m_pMVRSR = m_pCAP;
 		
-		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMB), FALSE);
-		m_pGB->FindInterface(IID_PPV_ARGS(&m_pMFVMB), FALSE);
+		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMB), TRUE);
 		m_pMVTO = m_pCAP;
 
 		SetupVMR9ColorControl();
@@ -13624,8 +13621,6 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 			if (IsD3DFullScreenMode() && !m_bAudioOnly) {
 				if (m_pVMB) {
 					m_OSD.Start(m_pVideoWnd, m_pVMB);
-				} else if (m_pMFVMB) {
-					m_OSD.Start(m_pVideoWnd, m_pMFVMB);
 				}
 			} else {
 				if (m_pMVTO) {
@@ -13753,7 +13748,6 @@ void CMainFrame::CloseMediaPrivate()
 	m_pVMRWC.Release();
 	m_pVMRMC9.Release();
 	m_pVMB.Release();
-	m_pMFVMB.Release();
 	m_pMVTO.Release();
 
 	m_pMFVP.Release();
