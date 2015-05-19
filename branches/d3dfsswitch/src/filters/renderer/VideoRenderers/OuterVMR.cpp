@@ -149,7 +149,7 @@ STDMETHODIMP COuterVMR9::GetAlphaBitmapParameters(VMR9AlphaBitmap* pBmpParms)
 	return S_OK;
 }
 
-STDMETHODIMP COuterVMR9::SetAlphaBitmap(const VMR9AlphaBitmap*  pBmpParms)
+STDMETHODIMP COuterVMR9::SetAlphaBitmap(const VMR9AlphaBitmap* pBmpParms)
 {
 	CheckPointer(pBmpParms, E_POINTER);
 	CAutoLock BitMapLock(&m_pAllocatorPresenter->m_VMR9AlphaBitmapLock);

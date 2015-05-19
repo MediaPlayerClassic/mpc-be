@@ -1316,6 +1316,8 @@ void CBaseAP::SyncOffsetStats(LONGLONG syncOffset)
 void CBaseAP::UpdateAlphaBitmap()
 {
 	m_VMR9AlphaBitmapData.Free();
+	m_pOSDTexture.Release();
+	m_pOSDSurface.Release();
 
 	if ((m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_DISABLE) == 0) {
 		HBITMAP hBitmap = (HBITMAP)GetCurrentObject (m_VMR9AlphaBitmap.hdc, OBJ_BITMAP);
@@ -1577,9 +1579,9 @@ STDMETHODIMP_(bool) CBaseAP::Paint(bool fAll)
 
 	if (m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_UPDATE) {
 		CAutoLock BitMapLock(&m_VMR9AlphaBitmapLock);
-		CRect		rcSrc (m_VMR9AlphaBitmap.rSrc);
-		m_pOSDTexture	= NULL;
-		m_pOSDSurface	= NULL;
+		CRect rcSrc(m_VMR9AlphaBitmap.rSrc);
+		m_pOSDTexture.Release();
+		m_pOSDSurface.Release();
 		if ((m_VMR9AlphaBitmap.dwFlags & VMRBITMAP_DISABLE) == 0 && (BYTE *)m_VMR9AlphaBitmapData) {
 			if ( (m_pD3DXLoadSurfaceFromMemory != NULL) &&
 					SUCCEEDED(hr = m_pD3DDev->CreateTexture(rcSrc.Width(), rcSrc.Height(), 1,
@@ -1590,8 +1592,8 @@ STDMETHODIMP_(bool) CBaseAP::Paint(bool fAll)
 													   NULL, &m_VMR9AlphaBitmapRect, D3DX_FILTER_NONE, m_VMR9AlphaBitmap.clrSrcKey);
 				}
 				if (FAILED (hr)) {
-					m_pOSDTexture	= NULL;
-					m_pOSDSurface	= NULL;
+					m_pOSDTexture.Release();
+					m_pOSDSurface.Release();
 				}
 			}
 		}
@@ -3879,7 +3881,7 @@ STDMETHODIMP CSyncRenderer::GetAlphaBitmapParameters(VMR9AlphaBitmap* pBmpParms)
 	return S_OK;
 }
 
-STDMETHODIMP CSyncRenderer::SetAlphaBitmap(const VMR9AlphaBitmap*  pBmpParms)
+STDMETHODIMP CSyncRenderer::SetAlphaBitmap(const VMR9AlphaBitmap* pBmpParms)
 {
 	CheckPointer(pBmpParms, E_POINTER);
 	CAutoLock BitMapLock(&m_pAllocatorPresenter->m_VMR9AlphaBitmapLock);
