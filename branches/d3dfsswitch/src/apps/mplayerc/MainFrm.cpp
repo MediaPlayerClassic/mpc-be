@@ -613,6 +613,7 @@ CMainFrame::CMainFrame() :
 	m_rtDurationOverride(-1),
 	m_bFullScreen(false),
 	m_bFirstFSAfterLaunchOnFullScreen(false),
+	m_bStartInD3DFullscreen(false),
 	m_bHideCursor(false),
 	m_lastMouseMove(-1, -1),
 	m_lastMouseMoveFullScreen(-1, -1),
@@ -1287,7 +1288,7 @@ BOOL CMainFrame::PreTranslateMessage(MSG* pMsg)
 			bool fEscapeNotAssigned = !AssignedToCmd(VK_ESCAPE, m_bFullScreen, false);
 
 			if (fEscapeNotAssigned) {
-				if (m_bFullScreen) {
+				if (m_bFullScreen || IsD3DFullScreenMode()) {
 					OnViewFullscreen();
 					if (m_eMediaLoadState == MLS_LOADED) {
 						PostMessage(WM_COMMAND, ID_PLAY_PAUSE);
@@ -1867,7 +1868,16 @@ void CMainFrame::OnSizing(UINT fwSide, LPRECT pRect)
 
 void CMainFrame::OnDisplayChange() // untested, not sure if it's working...
 {
-	TRACE(_T("*** CMainFrame::OnDisplayChange()\n"));
+	DbgLog((LOG_TRACE, 3, L"CMainFrame::OnDisplayChange() : start"));
+	if (m_eMediaLoadState == MLS_LOADED) {
+		if (m_pGraphThread) {
+			CAMMsgEvent e;
+			m_pGraphThread->PostThreadMessage(CGraphThread::TM_DISPLAY_CHANGE, 0, (LPARAM)&e);
+			e.WaitMsg();
+		} else {
+			DisplayChange();
+		}
+	}
 
 	GetDesktopWindow()->GetWindowRect(&m_rcDesktop);
 	if (IsD3DFullScreenMode()) {
@@ -1888,34 +1898,7 @@ void CMainFrame::OnDisplayChange() // untested, not sure if it's working...
 		}
 	}
 
-	AppSettings& s = AfxGetAppSettings();
-	if (s.iDSVideoRendererType != VIDRNDT_DS_MADVR && s.iDSVideoRendererType != VIDRNDT_DS_DXR) {
-		IDirect3D9* pD3D9 = NULL;
-		DWORD nPCIVendor = 0;
-
-		pD3D9 = Direct3DCreate9(D3D_SDK_VERSION);
-		if (pD3D9) {
-			D3DADAPTER_IDENTIFIER9 adapterIdentifier;
-			if (pD3D9->GetAdapterIdentifier(GetAdapter(pD3D9, m_hWnd), 0, &adapterIdentifier) == S_OK) {
-				nPCIVendor = adapterIdentifier.VendorId;
-			}
-			pD3D9->Release();
-		}
-
-		if (nPCIVendor == 0x8086) { // Disable ResetDevice for Intel, until can fix ...
-			return;
-		}
-	}
-
-	if (m_eMediaLoadState == MLS_LOADED) {
-		if (m_pGraphThread) {
-			CAMMsgEvent e;
-			m_pGraphThread->PostThreadMessage(CGraphThread::TM_DISPLAY_CHANGE, 0, (LPARAM)&e);
-			e.WaitMsg();
-		} else {
-			DisplayChange();
-		}
-	}
+	DbgLog((LOG_TRACE, 3, L"CMainFrame::OnDisplayChange() : end"));
 }
 
 void CMainFrame::OnSysCommand(UINT nID, LPARAM lParam)
@@ -1965,7 +1948,7 @@ void CMainFrame::OnActivateApp(BOOL bActive, DWORD dwThreadID)
 			HMONITOR hMonitor1 = MonitorFromWindow(m_hWnd, MONITOR_DEFAULTTONEAREST);
 			HMONITOR hMonitor2 = MonitorFromWindow(pWnd->m_hWnd, MONITOR_DEFAULTTONEAREST);
 			CMonitors monitors;
-			if (hMonitor1 && hMonitor2 && ((hMonitor1 != hMonitor2) || (monitors.GetCount()>1))) {
+			if (hMonitor1 && hMonitor2 && hMonitor1 != hMonitor2) {
 				fExitFullscreen = false;
 			}
 
@@ -2322,7 +2305,6 @@ void CMainFrame::OnTimer(UINT_PTR nIDEvent)
 				}
 				KillTimer(TIMER_FULLSCREENMOUSEHIDER);
 			} else {
-				CWnd* pWnd = WindowFromPoint(p);
 				if (pWnd && !m_bInOptions && (m_wndView == *pWnd || m_wndView.IsChild(pWnd) || fCursorOutside)) {
 					m_bHideCursor = true;
 					SetCursor(NULL);
@@ -2696,7 +2678,7 @@ bool CMainFrame::GraphEventComplete()
 				}
 				m_OSD.ClearMessage();
 
-				if (m_bFullScreen && s.fExitFullScreenAtTheEnd) {
+				if ((m_bFullScreen || IsD3DFullScreenMode()) && s.fExitFullScreenAtTheEnd) {
 					OnViewFullscreen();
 				}
 			}
@@ -2948,7 +2930,7 @@ LRESULT CMainFrame::OnGraphNotify(WPARAM wParam, LPARAM lParam)
 									m_pDVDC->ShowMenu(DVD_MENU_Title, DVD_CMD_FLAG_Block | DVD_CMD_FLAG_Flush, NULL);
 								}
 								s.fNormalStartDVD = true;
-								if (s.fRememberZoomLevel && !m_bFullScreen && !s.IsD3DFullscreen()) { // Hack to the normal initial zoom for DVD + DXVA ...
+								if (s.fRememberZoomLevel && !m_bFullScreen && !IsD3DFullScreenMode()) { // Hack to the normal initial zoom for DVD + DXVA ...
 									ZoomVideoWindow();
 								}
 							}
@@ -3119,7 +3101,7 @@ LRESULT CMainFrame::OnGraphNotify(WPARAM wParam, LPARAM lParam)
 			case EC_DVD_PLAYBACK_RATE_CHANGE:
 				if (m_pDVDC) {
 					if (m_fCustomGraph && s.AutoChangeFullscrRes.bEnabled == 1 &&
-							m_bFullScreen && m_iDVDDomain == DVD_DOMAIN_Title) {
+							(m_bFullScreen || IsD3DFullScreenMode()) && m_iDVDDomain == DVD_DOMAIN_Title) {
 						AutoChangeMonitorMode();
 					}
 				}
@@ -3132,6 +3114,8 @@ LRESULT CMainFrame::OnGraphNotify(WPARAM wParam, LPARAM lParam)
 
 LRESULT CMainFrame::OnResetDevice(WPARAM wParam, LPARAM lParam)
 {
+	DbgLog((LOG_TRACE, 3, L"CMainFrame::OnResetDevice() : start"));
+
 	OAFilterState fs = State_Stopped;
 	m_pMC->GetState(0, &fs);
 	if (fs == State_Running) {
@@ -3142,9 +3126,11 @@ LRESULT CMainFrame::OnResetDevice(WPARAM wParam, LPARAM lParam)
 		}
 	}
 
+	/*
 	if (m_OSD.GetOSDType() != OSD_TYPE_GDI) {
 		m_OSD.HideMessage(true);
 	}
+	*/
 
 	if (m_bOpenedThruThread) {
 		CAMMsgEvent e;
@@ -3154,13 +3140,17 @@ LRESULT CMainFrame::OnResetDevice(WPARAM wParam, LPARAM lParam)
 		ResetDevice();
 	}
 
+	/*
 	if (m_OSD.GetOSDType() != OSD_TYPE_GDI) {
 		m_OSD.HideMessage(false);
 	}
+	*/
 
 	if (fs == State_Running) {
 		m_pMC->Run();
 	}
+
+	DbgLog((LOG_TRACE, 3, L"CMainFrame::OnResetDevice() : end"));
 	return S_OK;
 }
 
@@ -3275,9 +3265,9 @@ BOOL CMainFrame::OnButton(UINT id, UINT nFlags, CPoint point)
 
 void CMainFrame::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	SetFocus();
-
 	if (!m_OSD.OnLButtonDown(nFlags, point)) {
+		SetFocus();
+
 		bDVDMenuClicked = false;
 		bDVDButtonAtPosition = false;
 
@@ -4006,6 +3996,12 @@ void CMainFrame::OnFilePostOpenMedia(CAutoPtr<OpenMediaData> pOMD)
 	ASSERT(m_eMediaLoadState == MLS_LOADING);
 	SetLoadState(MLS_LOADED);
 
+	// destroy invisible top-level d3dfs window if there is no video renderer
+	if (IsD3DFullScreenMode() && !m_pMFVDC && !m_pVMRWC) {
+		DestroyD3DWindow();
+		m_bStartInD3DFullscreen = true;
+	}
+
 	// remember OpenMediaData for later use
 	m_lastOMD.Free();
 	m_lastOMD.Attach(pOMD.Detach());
@@ -4113,7 +4109,7 @@ void CMainFrame::OnFilePostOpenMedia(CAutoPtr<OpenMediaData> pOMD)
 
 		// restore magnification
 		if (IsWindowVisible() && s.fRememberZoomLevel
-				&& !(m_bFullScreen || s.IsD3DFullscreen()
+				&& !(m_bFullScreen || IsD3DFullScreenMode()
 					|| wp.showCmd == SW_SHOWMAXIMIZED || wp.showCmd == SW_SHOWMINIMIZED)) {
 			ZoomVideoWindow(false);
 		}
@@ -4131,7 +4127,8 @@ void CMainFrame::OnFilePostOpenMedia(CAutoPtr<OpenMediaData> pOMD)
 
 	SendNowPlayingToApi();
 
-	if (s.AutoChangeFullscrRes.bEnabled == 1 && m_bFullScreen) {
+	if (s.AutoChangeFullscrRes.bEnabled == 1
+			&& (m_bFullScreen || IsD3DFullScreenMode())) {
 		AutoChangeMonitorMode();
 	}
 	if (m_bFullScreen && s.fRememberZoomLevel) {
@@ -4167,11 +4164,6 @@ void CMainFrame::OnFilePostCloseMedia()
 		m_closingmsg = ResStr(IDS_CONTROLS_CLOSED);
 	}
 
-	if (IsD3DFullScreenMode()) {
-		KillTimer(TIMER_FULLSCREENMOUSEHIDER);
-		KillTimer(TIMER_FULLSCREENCONTROLBARHIDER);
-		m_bHideCursor = false;
-	}
 	m_wndView.SetVideoRect();
 
 	AfxGetAppSettings().nCLSwitches &= CLSW_OPEN|CLSW_PLAY|CLSW_AFTERPLAYBACK_MASK|CLSW_NOFOCUS;
@@ -4261,8 +4253,9 @@ void CMainFrame::OnFilePostCloseMedia()
 
 	SetThreadExecutionState(ES_CONTINUOUS);
 
-	if (m_pFullscreenWnd->IsWindow()) {
-		m_pFullscreenWnd->DestroyWindow();
+	if (IsD3DFullScreenMode()) {
+		DestroyD3DWindow();
+		m_bStartInD3DFullscreen = true;
 	}
 
 	DbgLog((LOG_TRACE, 3, L"CMainFrame::OnFilePostCloseMedia() : end"));
@@ -4273,6 +4266,7 @@ void CMainFrame::OnBossKey()
 	if (m_wndFlyBar && m_wndFlyBar.IsWindowVisible()) {
 		m_wndFlyBar.ShowWindow(SW_HIDE);
 	}
+
 	// Disable animation
 	ANIMATIONINFO AnimationInfo;
 	AnimationInfo.cbSize = sizeof(ANIMATIONINFO);
@@ -4282,7 +4276,7 @@ void CMainFrame::OnBossKey()
 	::SystemParametersInfo(SPI_SETANIMATION, sizeof(ANIMATIONINFO), &AnimationInfo, 0);
 
 	SendMessage(WM_COMMAND, ID_PLAY_PAUSE);
-	if (m_bFullScreen) {
+	if (m_bFullScreen || IsD3DFullScreenMode()) {
 		SendMessage(WM_COMMAND, ID_VIEW_FULLSCREEN);
 	}
 	SendMessage(WM_SYSCOMMAND, SC_MINIMIZE, -1);
@@ -7025,12 +7019,24 @@ void CMainFrame::OnUpdateViewNormal(CCmdUI* pCmdUI)
 
 void CMainFrame::OnViewFullscreen()
 {
-	ToggleFullscreen(true, true);
+	const CAppSettings& s = AfxGetAppSettings();
+
+	if (IsD3DFullScreenMode() || (s.IsD3DFullscreen() && !m_bFullScreen && !m_bAudioOnly)) {
+		ToggleD3DFullscreen(true);
+	} else {
+		ToggleFullscreen(true, true);
+	}
 }
 
 void CMainFrame::OnViewFullscreenSecondary()
 {
-	ToggleFullscreen(true, false);
+	const CAppSettings& s = AfxGetAppSettings();
+
+	if (IsD3DFullScreenMode() || (s.IsD3DFullscreen() && !m_bFullScreen && !m_bAudioOnly)) {
+		ToggleD3DFullscreen(false);
+	} else {
+		ToggleFullscreen(true, false);
+	}
 }
 
 void CMainFrame::OnUpdateViewFullscreen(CCmdUI* pCmdUI)
@@ -10120,10 +10126,15 @@ void CMainFrame::SetDefaultFullscreenState()
 
 	// Waffs : fullscreen command line
 	if (!(s.nCLSwitches & CLSW_ADD) && (s.nCLSwitches & CLSW_FULLSCREEN) && !s.slFiles.IsEmpty()) {
-		ToggleFullscreen(true, true);
+		if (s.IsD3DFullscreen()) {
+			m_bStartInD3DFullscreen = true;
+		} else {
+			ToggleFullscreen(true, true);
+			m_bFirstFSAfterLaunchOnFullScreen = true;
+		}
+		
 		SetCursor(NULL);
 		s.nCLSwitches &= ~CLSW_FULLSCREEN;
-		m_bFirstFSAfterLaunchOnFullScreen = true;
 	}
 }
 
@@ -10475,6 +10486,70 @@ void CMainFrame::ToggleFullscreen(bool fToNearest, bool fSwitchScreenResWhenHasT
 	UpdateThumbarButton();
 }
 
+void CMainFrame::ToggleD3DFullscreen(bool fSwitchScreenResWhenHasTo)
+{
+	CComQIPtr<ID3DFullscreenControl> pD3DFS;
+	if (m_pMFVDC) {
+		pD3DFS = m_pMFVDC;
+	} else {
+		pD3DFS = m_pVMRWC;
+	}
+
+	if (pD3DFS) {
+		CAppSettings& s = AfxGetAppSettings();
+
+		bool bIsFullscreen = false;
+		pD3DFS->GetD3DFullscreen(&bIsFullscreen);
+
+		//
+		m_OSD.Stop();
+		//
+
+		if (bIsFullscreen) {
+			// Turn off D3D Fullscreen
+			pD3DFS->SetD3DFullscreen(false);
+
+			// Assign the windowed video frame and pass it to the relevant classes.
+			m_pVideoWnd = &m_wndView;
+			if (m_pMFVDC) {
+				m_pMFVDC->SetVideoWindow(m_pVideoWnd->m_hWnd);
+			} else {
+				m_pVMRWC->SetVideoClippingWindow(m_pVideoWnd->m_hWnd);
+			}
+
+			if (s.AutoChangeFullscrRes.bEnabled == 1 && s.AutoChangeFullscrRes.bApplyDefault && s.AutoChangeFullscrRes.dmFullscreenRes[0].bChecked == 1) {
+				SetDispMode(s.AutoChangeFullscrRes.dmFullscreenRes[0].dmFSRes, s.strFullScreenMonitor);
+			}
+
+			// Destroy the D3D Fullscreen window
+			DestroyD3DWindow();
+
+			MoveVideoWindow();
+		} else {
+			// Set the fullscreen display mode
+			if (s.AutoChangeFullscrRes.bEnabled == 1 && fSwitchScreenResWhenHasTo) {
+				AutoChangeMonitorMode();
+			}
+
+			// Create a new D3D Fullscreen window
+			CreateFullScreenWindow();
+
+			// Turn on D3D Fullscreen
+			pD3DFS->SetD3DFullscreen(true);
+
+			// Assign the windowed video frame and pass it to the relevant classes.
+			m_pVideoWnd = m_pFullscreenWnd;
+			if (m_pMFVDC) {
+				m_pMFVDC->SetVideoWindow(m_pVideoWnd->m_hWnd);
+			} else {
+				m_pVMRWC->SetVideoClippingWindow(m_pVideoWnd->m_hWnd);
+			}
+
+			MoveVideoWindow();
+		}
+	}
+}
+
 void CMainFrame::AutoChangeMonitorMode()
 {
 	AppSettings& s = AfxGetAppSettings();
@@ -10521,13 +10596,9 @@ void CMainFrame::AutoChangeMonitorMode()
 
 	if (s.AutoChangeFullscrRes.bEnabled == 1 && iMonValid == 1) {
 		double MediaFPS = 0.0;
-		if (s.IsD3DFullscreen() && miFPS > 0.9) {
-			MediaFPS = miFPS;
-		} else {
-			const REFERENCE_TIME rtAvgTimePerFrame = std::llround(GetAvgTimePerFrame() * 10000000i64);
-			if (rtAvgTimePerFrame > 0) {
-				MediaFPS = 10000000.0 / rtAvgTimePerFrame;
-			}
+		const REFERENCE_TIME rtAvgTimePerFrame = std::llround(GetAvgTimePerFrame() * 10000000i64);
+		if (rtAvgTimePerFrame > 0) {
+			MediaFPS = 10000000.0 / rtAvgTimePerFrame;
 		}
 
 		if (MediaFPS == 0.0) {
@@ -10547,7 +10618,7 @@ void CMainFrame::AutoChangeMonitorMode()
 
 	} else if (s.AutoChangeFullscrRes.bEnabled == 2) {
 
-		if (iMonValid == 1 && s.dFPS >= 1){
+		if (iMonValid == 1 && s.dFPS >= 1) {
 			for (int rs = 0; rs < MaxFpsCount ; rs++) {
 				if (s.AutoChangeFullscrRes.dmFullscreenRes[rs].bValid
 					&& s.AutoChangeFullscrRes.dmFullscreenRes[rs].bChecked
@@ -11078,18 +11149,11 @@ CString CMainFrame::OpenCreateGraphObject(OpenMediaData* pOMD)
 
 	m_pGB_preview = NULL;
 
-	if (s.IsD3DFullscreen()) {
-		CreateFullScreenWindow();
-		m_pVideoWnd		= m_pFullscreenWnd;
-		m_bUseSmartSeek	= false;
-	} else {
-		m_pVideoWnd		= &m_wndView;
-		m_bUseSmartSeek	= s.fSmartSeek && !s.fD3DFullscreen;
-		if (OpenFileData* p = dynamic_cast<OpenFileData*>(pOMD)) {
-			CString fn = p->fns.GetHead();
-			if (!fn.IsEmpty() && (fn.Find(_T("://")) >= 0)) { // disable SmartSeek for streaming data.
-				m_bUseSmartSeek = false;
-			}
+	m_bUseSmartSeek	= s.fSmartSeek;
+	if (OpenFileData* p = dynamic_cast<OpenFileData*>(pOMD)) {
+		CString fn = p->fns.GetHead();
+		if (!fn.IsEmpty() && (fn.Find(_T("://")) >= 0)) { // disable SmartSeek for streaming data.
+			m_bUseSmartSeek = false;
 		}
 	}
 
@@ -12338,13 +12402,6 @@ void CMainFrame::OpenSetupVideo()
 			m_pVW_preview->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 		}
 	}
-
-	if (m_bAudioOnly && IsD3DFullScreenMode()) {
-		m_pFullscreenWnd->DestroyWindow();
-		KillTimer(TIMER_FULLSCREENMOUSEHIDER);
-		KillTimer(TIMER_FULLSCREENCONTROLBARHIDER);
-		m_bHideCursor = false;
-	}
 }
 
 void CMainFrame::OpenSetupAudio()
@@ -13299,139 +13356,6 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 
 	AppSettings& s = AfxGetAppSettings();
 
-	CString mi_fn;
-	for (;;) {
-		if (pFileData) {
-			if (pFileData->fns.IsEmpty()) {
-				ASSERT(FALSE);
-				break;
-			}
-
-			CString fn = pFileData->fns.GetHead();
-
-			int i = fn.Find(_T(":\\"));
-			if (i > 0) {
-				CString drive = fn.Left(i+2);
-				UINT type = GetDriveType(drive);
-				CAtlList<CString> sl;
-				if (type == DRIVE_REMOVABLE || (type == DRIVE_CDROM && GetCDROMType(drive[0], sl) != CDROM_Audio)) {
-					int ret = IDRETRY;
-					while (ret == IDRETRY) {
-						WIN32_FIND_DATA findFileData;
-						HANDLE h = FindFirstFile(fn, &findFileData);
-						if (h != INVALID_HANDLE_VALUE) {
-							FindClose(h);
-							ret = IDOK;
-						} else {
-							CString msg;
-							msg.Format(ResStr(IDS_MAINFRM_114), fn);
-							ret = AfxMessageBox(msg, MB_RETRYCANCEL);
-						}
-					}
-
-					if (ret != IDOK) {
-						ASSERT(FALSE);
-						break;
-					}
-				}
-			}
-			mi_fn = fn;
-		}
-
-		miFPS	= 0.0;
-		s.dFPS	= 0.0;
-
-		if ((s.AutoChangeFullscrRes.bEnabled == 1 && s.IsD3DFullscreen()) || s.AutoChangeFullscrRes.bEnabled == 2) {
-			// DVD
-			if (pDVDData) {
-				mi_fn = pDVDData->path;
-				CString ext = GetFileExt(mi_fn);
-				if (ext.IsEmpty()) {
-					if (mi_fn.Right(10) == _T("\\VIDEO_TS\\")) {
-						mi_fn = mi_fn + _T("VTS_01_1.VOB");
-					} else {
-						mi_fn = mi_fn + _T("\\VIDEO_TS\\VTS_01_1.VOB");
-					}
-				} else if (ext == _T(".IFO")) {
-					mi_fn = GetFolderOnly(mi_fn) + _T("\\VTS_01_1.VOB");
-				}
-			} else {
-				CString ext = GetFileExt(mi_fn);
-				// BD
-				if (ext == _T(".mpls")) {
-					CHdmvClipInfo ClipInfo;
-					CHdmvClipInfo::CPlaylist CurPlaylist;
-					REFERENCE_TIME rtDuration;
-					if (SUCCEEDED(ClipInfo.ReadPlaylist(mi_fn, rtDuration, CurPlaylist))) {
-						mi_fn = CurPlaylist.GetHead()->m_strFileName;
-					}
-				} else if (ext == _T(".IFO")) {
-					// DVD structure
-					CString sVOB = mi_fn;
-
-					for (int i = 1; i < 100; i++) {
-						sVOB = mi_fn;
-						CString vob;
-						vob.Format(_T("%d.VOB"), i);
-						sVOB.Replace(_T("0.IFO"), vob);
-
-						if (::PathFileExists(sVOB)) {
-							mi_fn = sVOB;
-							break;
-						}
-					}
-				}
-			}
-
-			// Get FPS
-			MediaInfo MI;
-			MI.Option(_T("ParseSpeed"), _T("0"));
-			if (MI.Open(mi_fn.GetString())) {
-				for (int i = 0; i < 2; i++) {
-					CString strFPS = MI.Get(Stream_Video, 0, _T("FrameRate"), Info_Text, Info_Name).c_str();
-					if (strFPS.IsEmpty() || _wtof(strFPS) > 200.0) {
-						strFPS = MI.Get(Stream_Video, 0, _T("FrameRate_Original"), Info_Text, Info_Name).c_str();
-					}
-					CString strST = MI.Get(Stream_Video, 0, _T("ScanType"), Info_Text, Info_Name).c_str();
-					CString strSO = MI.Get(Stream_Video, 0, _T("ScanOrder"), Info_Text, Info_Name).c_str();
-
-					double nFactor = 1.0;
-
-					// 2:3 pulldown
-					if (strFPS == _T("29.970") && (strSO == _T("2:3 Pulldown") || (strST == _T("Progressive") && (strSO == _T("TFF") || strSO == _T("BFF") || strSO == _T("2:3 Pulldown"))))) {
-						strFPS = _T("23.976");
-					} else if (strST == _T("Interlaced") || strST == _T("MBAFF")) {
-						// double fps for Interlaced video.
-						nFactor = 2.0;
-					}
-					miFPS = _wtof(strFPS);
-					if (miFPS < 30.0 && nFactor > 1.0) {
-						miFPS *= nFactor;
-					}
-
-					if (miFPS > 0.9) {
-						break;
-					}
-
-					MI.Close();
-					MI.Option(_T("ParseSpeed"), _T("0.5"));
-					if (!MI.Open(mi_fn.GetString())) {
-						break;
-					}
-				}
-				s.dFPS = miFPS;
-
-				AutoChangeMonitorMode();
-
-				if (s.fLaunchfullscreen && !s.IsD3DFullscreen() && !m_bFullScreen && !m_bAudioOnly ) {
-					ToggleFullscreen(true, true);
-				}
-			}
-		}
-
-		break;
-	}
-
 	CString err, aborted(ResStr(IDS_AG_ABORTED));
 
 	m_fUpdateInfoBar = false;
@@ -13489,6 +13413,7 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pCAP), TRUE);
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pCAP2), TRUE);
+		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMRWC), FALSE); // might have IVMRMixerBitmap9, but not IVMRWindowlessControl9
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMRMC9), TRUE);
 		m_pGB->FindInterface(IID_PPV_ARGS(&pVMB), TRUE);
 		m_pGB->FindInterface(IID_PPV_ARGS(&pMFVMB), TRUE);
@@ -13672,6 +13597,7 @@ void CMainFrame::CloseMediaPrivate()
 	m_pMVRSR.Release();
 	m_pCAP2.Release();
 	m_pCAP.Release();
+	m_pVMRWC.Release();
 	m_pVMRMC9.Release();
 	m_pMFVP.Release();
 	m_pMFVDC.Release();
@@ -15417,13 +15343,17 @@ void CMainFrame::ShowControls(int nCS, bool fSave)
 
 void CMainFrame::SetAlwaysOnTop(int i)
 {
-	AfxGetAppSettings().iOnTop = i;
+	CAppSettings& s = AfxGetAppSettings();
 
-	if (!m_bFullScreen) {
+	if (!m_bFullScreen && !IsD3DFullScreenMode()) {
 		const CWnd* pInsertAfter = NULL;
 
 		if (i == 0) {
-			pInsertAfter = &wndNoTopMost;
+			// We only want to disable "On Top" once so that
+			// we don't interfere with other window manager
+			if (s.iOnTop) {
+				pInsertAfter = &wndNoTopMost;
+			}
 		} else if (i == 1) {
 			pInsertAfter = &wndTopMost;
 		} else if (i == 2) {
@@ -15432,12 +15362,12 @@ void CMainFrame::SetAlwaysOnTop(int i)
 			pInsertAfter = (GetMediaState() == State_Running && !m_bAudioOnly) ? &wndTopMost : &wndNoTopMost;
 		}
 
-		SetWindowPos(pInsertAfter, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
-	} else if (!(GetWindowLongPtr(m_hWnd, GWL_EXSTYLE)&WS_EX_TOPMOST)) {
-		if (!AfxGetAppSettings().IsD3DFullscreen()) {
-			SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+		if (pInsertAfter) {
+			SetWindowPos(pInsertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		}
 	}
+
+	s.iOnTop = i;
 }
 
 ISubStream *InsertSubStream(CInterfaceList<ISubStream> *subStreams, const CComPtr<ISubStream> &theSubStream)
@@ -16626,7 +16556,16 @@ void CMainFrame::OpenMedia(CAutoPtr<OpenMediaData> pOMD)
 	AppSettings& s = AfxGetAppSettings();
 
 	bool bDirectShow	= pFileData && !pFileData->fns.IsEmpty() && s.GetRtspEngine(pFileData->fns.GetHead()) == DirectShow;
-	bool bUseThread		= m_pGraphThread && s.fEnableWorkerThreadForOpening && (bDirectShow || !pFileData) && !pDeviceData && !s.IsD3DFullscreen();
+	bool bUseThread		= m_pGraphThread && s.fEnableWorkerThreadForOpening && (bDirectShow || !pFileData) && !pDeviceData;
+
+	// create d3dfs window if launching in fullscreen and d3dfs is enabled
+	if (s.IsD3DFullscreen() && (m_bStartInD3DFullscreen || s.fLaunchfullscreen)) {
+		CreateFullScreenWindow();
+		m_pVideoWnd = m_pFullscreenWnd;
+		m_bStartInD3DFullscreen = false;
+	} else {
+		m_pVideoWnd = &m_wndView;
+	}
 
 	// don't set video renderer output rect until the window is repositioned
 	m_bDelaySetOutputRect = true;
@@ -16872,6 +16811,20 @@ bool CMainFrame::IsD3DFullScreenMode() const
 {
 	return m_pFullscreenWnd && m_pFullscreenWnd->IsWindow();
 };
+
+void CMainFrame::DestroyD3DWindow()
+{
+	if (IsD3DFullScreenMode()) {
+		m_pFullscreenWnd->ShowWindow(SW_HIDE);
+		m_pFullscreenWnd->DestroyWindow();
+
+		KillTimer(TIMER_FULLSCREENMOUSEHIDER);
+		KillTimer(TIMER_FULLSCREENCONTROLBARHIDER);
+		m_bHideCursor = false;
+
+		SetFocus();
+	}
+}
 
 void CMainFrame::SetupEVRColorControl()
 {
@@ -19089,6 +19042,9 @@ void CGraphThread::OnDisplayChange(WPARAM wParam, LPARAM lParam)
 {
 	if (m_pMainFrame) {
 		m_pMainFrame->DisplayChange();
+	}
+	if (CAMEvent* e = (CAMEvent*)lParam) {
+		e->Set();
 	}
 }
 
