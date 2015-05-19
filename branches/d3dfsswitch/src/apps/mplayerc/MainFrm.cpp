@@ -683,7 +683,8 @@ CMainFrame::CMainFrame() :
 	m_DwmInvalidateIconicBitmapsFnc(NULL),
 	m_OSD(this),
 	m_wndToolBar(this),
-	m_wndSeekBar(this)
+	m_wndSeekBar(this),
+	miFPS(0.0)
 {
 	m_Lcd.SetVolumeRange(0, 100);
 	m_LastSaveTime.QuadPart = 0;
@@ -10596,9 +10597,13 @@ void CMainFrame::AutoChangeMonitorMode()
 
 	if (s.AutoChangeFullscrRes.bEnabled == 1 && iMonValid == 1) {
 		double MediaFPS = 0.0;
-		const REFERENCE_TIME rtAvgTimePerFrame = std::llround(GetAvgTimePerFrame() * 10000000i64);
-		if (rtAvgTimePerFrame > 0) {
-			MediaFPS = 10000000.0 / rtAvgTimePerFrame;
+		if (s.IsD3DFullscreen() && miFPS > 0.9) {
+			MediaFPS = miFPS;
+		} else {
+			const REFERENCE_TIME rtAvgTimePerFrame = std::llround(GetAvgTimePerFrame() * 10000000i64);
+			if (rtAvgTimePerFrame > 0) {
+				MediaFPS = 10000000.0 / rtAvgTimePerFrame;
+			}
 		}
 
 		if (MediaFPS == 0.0) {
@@ -13356,6 +13361,140 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 
 	AppSettings& s = AfxGetAppSettings();
 
+	CString mi_fn;
+	for (;;) {
+		if (pFileData) {
+			if (pFileData->fns.IsEmpty()) {
+				ASSERT(FALSE);
+				break;
+			}
+
+			CString fn = pFileData->fns.GetHead();
+
+			int i = fn.Find(_T(":\\"));
+			if (i > 0) {
+				CString drive = fn.Left(i+2);
+				UINT type = GetDriveType(drive);
+				CAtlList<CString> sl;
+				if (type == DRIVE_REMOVABLE || (type == DRIVE_CDROM && GetCDROMType(drive[0], sl) != CDROM_Audio)) {
+					int ret = IDRETRY;
+					while (ret == IDRETRY) {
+						WIN32_FIND_DATA findFileData;
+						HANDLE h = FindFirstFile(fn, &findFileData);
+						if (h != INVALID_HANDLE_VALUE) {
+							FindClose(h);
+							ret = IDOK;
+						} else {
+							CString msg;
+							msg.Format(ResStr(IDS_MAINFRM_114), fn);
+							ret = AfxMessageBox(msg, MB_RETRYCANCEL);
+						}
+					}
+
+					if (ret != IDOK) {
+						ASSERT(FALSE);
+						break;
+					}
+				}
+			}
+			mi_fn = fn;
+		}
+
+		miFPS	= 0.0;
+		s.dFPS	= 0.0;
+
+		if ((s.AutoChangeFullscrRes.bEnabled == 1 && IsD3DFullScreenMode() && s.fLaunchfullscreen)
+				|| s.AutoChangeFullscrRes.bEnabled == 2) {
+			// DVD
+			if (pDVDData) {
+				mi_fn = pDVDData->path;
+				CString ext = GetFileExt(mi_fn);
+				if (ext.IsEmpty()) {
+					if (mi_fn.Right(10) == L"\\VIDEO_TS\\") {
+						mi_fn = mi_fn + L"VTS_01_1.VOB";
+					} else {
+						mi_fn = mi_fn + L"\\VIDEO_TS\\VTS_01_1.VOB";
+					}
+				} else if (ext == L".IFO") {
+					mi_fn = GetFolderOnly(mi_fn) + L"\\VTS_01_1.VOB";
+				}
+			} else {
+				CString ext = GetFileExt(mi_fn);
+				// BD
+				if (ext == L".mpls") {
+					CHdmvClipInfo ClipInfo;
+					CHdmvClipInfo::CPlaylist CurPlaylist;
+					REFERENCE_TIME rtDuration;
+					if (SUCCEEDED(ClipInfo.ReadPlaylist(mi_fn, rtDuration, CurPlaylist))) {
+						mi_fn = CurPlaylist.GetHead()->m_strFileName;
+					}
+				} else if (ext == L".IFO") {
+					// DVD structure
+					CString sVOB = mi_fn;
+
+					for (int i = 1; i < 10; i++) {
+						sVOB = mi_fn;
+						CString vob;
+						vob.Format(L"%d.VOB", i);
+						sVOB.Replace(L"0.IFO", vob);
+
+						if (::PathFileExists(sVOB)) {
+							mi_fn = sVOB;
+							break;
+						}
+					}
+				}
+			}
+
+			// Get FPS
+			MediaInfo MI;
+			MI.Option(L"ParseSpeed", L"0");
+			if (MI.Open(mi_fn.GetString())) {
+				for (int i = 0; i < 2; i++) {
+					CString strFPS = MI.Get(Stream_Video, 0, L"FrameRate", Info_Text, Info_Name).c_str();
+					if (strFPS.IsEmpty() || _wtof(strFPS) > 200.0) {
+						strFPS = MI.Get(Stream_Video, 0, L"FrameRate_Original", Info_Text, Info_Name).c_str();
+					}
+					CString strST = MI.Get(Stream_Video, 0, L"ScanType", Info_Text, Info_Name).c_str();
+					CString strSO = MI.Get(Stream_Video, 0, L"ScanOrder", Info_Text, Info_Name).c_str();
+
+					double nFactor = 1.0;
+
+					// 2:3 pulldown
+					if (strFPS == L"29.970" && (strSO == L"2:3 Pulldown" || (strST == L"Progressive" && (strSO == L"TFF" || strSO == L"BFF" || strSO == L"2:3 Pulldown")))) {
+						strFPS = L"23.976";
+					} else if (strST == L"Interlaced" || strST == L"MBAFF") {
+						// double fps for Interlaced video.
+						nFactor = 2.0;
+					}
+					miFPS = _wtof(strFPS);
+					if (miFPS < 30.0 && nFactor > 1.0) {
+						miFPS *= nFactor;
+					}
+
+					if (miFPS > 0.9) {
+						break;
+					}
+
+					MI.Close();
+					MI.Option(L"ParseSpeed", L"0.5");
+					if (!MI.Open(mi_fn.GetString())) {
+						break;
+					}
+				}
+				s.dFPS = miFPS;
+
+				AutoChangeMonitorMode();
+				
+				if (s.fLaunchfullscreen && !IsD3DFullScreenMode() && !m_bFullScreen && !m_bAudioOnly ) {
+					ToggleFullscreen(true, true);
+				}
+			}
+		}
+
+		break;
+	}
+
 	CString err, aborted(ResStr(IDS_AG_ABORTED));
 
 	m_fUpdateInfoBar = false;
@@ -13415,9 +13554,10 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pCAP2), TRUE);
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMRWC), FALSE); // might have IVMRMixerBitmap9, but not IVMRWindowlessControl9
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pVMRMC9), TRUE);
-		m_pGB->FindInterface(IID_PPV_ARGS(&pVMB), TRUE);
-		m_pGB->FindInterface(IID_PPV_ARGS(&pMFVMB), TRUE);
 		m_pMVRSR = m_pCAP;
+		
+		m_pGB->FindInterface(IID_PPV_ARGS(&pVMB), FALSE);
+		m_pGB->FindInterface(IID_PPV_ARGS(&pMFVMB), FALSE);
 		pMVTO = m_pCAP;
 
 		SetupVMR9ColorControl();
@@ -13427,8 +13567,8 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 		m_pGB->FindInterface(IID_PPV_ARGS(&m_pMFVP), TRUE);
 		if (m_pMFVDC) {
 			RECT Rect;
-			::GetClientRect (m_pVideoWnd->m_hWnd, &Rect);
-			m_pMFVDC->SetVideoWindow (m_pVideoWnd->m_hWnd);
+			m_pVideoWnd->GetClientRect(&Rect);
+			m_pMFVDC->SetVideoWindow(m_pVideoWnd->m_hWnd);
 			m_pMFVDC->SetVideoPosition(NULL, &Rect);
 		}
 
@@ -13437,10 +13577,10 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 			m_pGB_preview->FindInterface(IID_PPV_ARGS(&m_pMFVP_preview), TRUE);
 
 			if (m_pMFVDC_preview) {
-				RECT Rect2;
-				::GetClientRect (m_wndPreView.GetVideoHWND(), &Rect2);
-				m_pMFVDC_preview->SetVideoWindow (m_wndPreView.GetVideoHWND());
-				m_pMFVDC_preview->SetVideoPosition(NULL, &Rect2);
+				RECT Rect;
+				m_wndPreView.GetClientRect(&Rect);
+				m_pMFVDC_preview->SetVideoWindow(m_wndPreView.GetVideoHWND());
+				m_pMFVDC_preview->SetVideoPosition(NULL, &Rect);
 			}
 		}
 
@@ -13463,7 +13603,6 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 		}
 
 		if (s.fShowOSD || s.fShowDebugInfo) { // Force OSD on when the debug switch is used
-
 			m_OSD.Stop();
 
 			if (s.IsD3DFullscreen() && !m_bAudioOnly) {
