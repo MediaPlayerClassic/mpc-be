@@ -4167,10 +4167,12 @@ void CMainFrame::OnFilePostCloseMedia()
 
 	m_wndView.SetVideoRect();
 
-	AfxGetAppSettings().nCLSwitches &= CLSW_OPEN|CLSW_PLAY|CLSW_AFTERPLAYBACK_MASK|CLSW_NOFOCUS;
-	AfxGetAppSettings().ResetPositions();
+	CAppSettings& s = AfxGetAppSettings();
 
-	if (AfxGetAppSettings().fShowOSD) {
+	s.nCLSwitches &= CLSW_OPEN | CLSW_PLAY | CLSW_AFTERPLAYBACK_MASK | CLSW_NOFOCUS;
+	s.ResetPositions();
+
+	if (s.fShowOSD) {
 		m_OSD.Start(m_pOSDWnd);
 	}
 
@@ -4207,7 +4209,7 @@ void CMainFrame::OnFilePostCloseMedia()
 	m_wndStatusBar.ShowTimer(false);
 	m_wndStatusBar.Relayout();
 
-	if (AfxGetAppSettings().fEnableEDLEditor) {
+	if (s.fEnableEDLEditor) {
 		m_wndEditListEditor.CloseFile();
 	}
 
@@ -4218,8 +4220,8 @@ void CMainFrame::OnFilePostCloseMedia()
 
 	if (IsWindow(m_wndCaptureBar.m_hWnd)) {
 		ShowControlBar(&m_wndCaptureBar, FALSE, TRUE);
-		m_wndCaptureBar.m_capdlg.SetupVideoControls(_T(""), NULL, NULL, NULL);
-		m_wndCaptureBar.m_capdlg.SetupAudioControls(_T(""), NULL, CInterfaceArray<IAMAudioInputMixer>());
+		m_wndCaptureBar.m_capdlg.SetupVideoControls(L"", NULL, NULL, NULL);
+		m_wndCaptureBar.m_capdlg.SetupAudioControls(L"", NULL, CInterfaceArray<IAMAudioInputMixer>());
 	}
 
 	RecalcLayout();
@@ -4228,7 +4230,7 @@ void CMainFrame::OnFilePostCloseMedia()
 	SetWindowText(m_strTitle);
 	m_Lcd.SetMediaTitle(LPCTSTR(m_strTitle));
 
-	SetAlwaysOnTop(AfxGetAppSettings().iOnTop);
+	SetAlwaysOnTop(s.iOnTop);
 
 	m_bIsBDPlay = FALSE;
 
@@ -10502,9 +10504,7 @@ void CMainFrame::ToggleD3DFullscreen(bool fSwitchScreenResWhenHasTo)
 		bool bIsFullscreen = false;
 		pD3DFS->GetD3DFullscreen(&bIsFullscreen);
 
-		//
 		m_OSD.Stop();
-		//
 
 		if (bIsFullscreen) {
 			// Turn off D3D Fullscreen
@@ -10522,10 +10522,15 @@ void CMainFrame::ToggleD3DFullscreen(bool fSwitchScreenResWhenHasTo)
 				SetDispMode(s.AutoChangeFullscrRes.dmFullscreenRes[0].dmFSRes, s.strFullScreenMonitor);
 			}
 
+			if (s.fShowOSD) {
+				m_OSD.Start(m_pOSDWnd);
+			}
+
 			// Destroy the D3D Fullscreen window
 			DestroyD3DWindow();
 
 			MoveVideoWindow();
+			RecalcLayout();
 		} else {
 			// Set the fullscreen display mode
 			if (s.AutoChangeFullscrRes.bEnabled == 1 && fSwitchScreenResWhenHasTo) {
@@ -12407,6 +12412,12 @@ void CMainFrame::OpenSetupVideo()
 			m_pVW_preview->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN);
 		}
 	}
+
+	// destroy invisible top-level d3dfs window if there is no video renderer
+	if (IsD3DFullScreenMode() && m_bAudioOnly) {
+		DestroyD3DWindow();
+		m_bStartInD3DFullscreen = true;
+	}
 }
 
 void CMainFrame::OpenSetupAudio()
@@ -13605,7 +13616,7 @@ bool CMainFrame::OpenMediaPrivate(CAutoPtr<OpenMediaData> pOMD)
 		if (s.fShowOSD || s.fShowDebugInfo) { // Force OSD on when the debug switch is used
 			m_OSD.Stop();
 
-			if (s.IsD3DFullscreen() && !m_bAudioOnly) {
+			if (IsD3DFullScreenMode() && !m_bAudioOnly) {
 				if (pMVTO) {
 					m_OSD.Start(m_pVideoWnd, pMVTO);
 				} else if (pVMB) {

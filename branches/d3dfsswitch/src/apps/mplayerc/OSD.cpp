@@ -306,6 +306,12 @@ void COSD::Start(CWnd* pWnd)
 
 void COSD::Stop()
 {
+	m_bCursorMoving			= false;
+	m_bSeekBarVisible		= false;
+	m_bFlyBarVisible		= false;
+	bMouseOverExitButton	= false;
+	bMouseOverCloseButton	= false;
+
 	ClearMessage();
 
 	m_pVMB.Release();
