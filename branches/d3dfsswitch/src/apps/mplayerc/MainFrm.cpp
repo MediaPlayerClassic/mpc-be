@@ -10551,10 +10551,12 @@ void CMainFrame::ToggleD3DFullscreen(bool fSwitchScreenResWhenHasTo)
 				m_pVMRWC->SetVideoClippingWindow(m_pVideoWnd->m_hWnd);
 			}
 
-			if (m_pVMB) {
-				m_OSD.Start(m_pVideoWnd, m_pVMB);
-			} else if (m_pMFVMB) {
-				m_OSD.Start(m_pVideoWnd, m_pMFVMB);
+			if (s.fShowOSD || s.fShowDebugInfo) {
+				if (m_pVMB) {
+					m_OSD.Start(m_pVideoWnd, m_pVMB);
+				} else if (m_pMFVMB) {
+					m_OSD.Start(m_pVideoWnd, m_pMFVMB);
+				}
 			}
 
 			MoveVideoWindow();
