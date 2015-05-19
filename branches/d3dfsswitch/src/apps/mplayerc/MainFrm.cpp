@@ -15500,17 +15500,13 @@ void CMainFrame::ShowControls(int nCS, bool fSave)
 
 void CMainFrame::SetAlwaysOnTop(int i)
 {
-	CAppSettings& s = AfxGetAppSettings();
+	AfxGetAppSettings().iOnTop = i;
 
 	if (!m_bFullScreen && !IsD3DFullScreenMode()) {
 		const CWnd* pInsertAfter = NULL;
 
 		if (i == 0) {
-			// We only want to disable "On Top" once so that
-			// we don't interfere with other window manager
-			if (s.iOnTop) {
-				pInsertAfter = &wndNoTopMost;
-			}
+			pInsertAfter = &wndNoTopMost;
 		} else if (i == 1) {
 			pInsertAfter = &wndTopMost;
 		} else if (i == 2) {
@@ -15522,9 +15518,9 @@ void CMainFrame::SetAlwaysOnTop(int i)
 		if (pInsertAfter) {
 			SetWindowPos(pInsertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 		}
+	} else if (m_bFullScreen && !(GetWindowLongPtr(m_hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST)) {
+		SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 	}
-
-	s.iOnTop = i;
 }
 
 ISubStream *InsertSubStream(CInterfaceList<ISubStream> *subStreams, const CComPtr<ISubStream> &theSubStream)
