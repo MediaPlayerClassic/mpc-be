@@ -188,7 +188,7 @@ private :
 	// Gdiplus::GdiplusStartupInput m_gdiplusStartupInput;
 	// ULONG_PTR m_gdiplusToken;
 
-	bool CheckWindowFromPoint(CPoint p) const;
+	bool CheckWindowFromCursor() const;
 
 protected:
 	BOOL PreCreateWindow(CREATESTRUCT& cs);
