@@ -541,7 +541,10 @@ void COSD::UpdateSeekBarPos(CPoint point)
 bool COSD::CheckWindowFromPoint(CPoint p) const
 {
 	if (m_pWnd) {
-		CWnd* pWnd = WindowFromPoint(p);
+		CPoint point(p);
+		::MapWindowPoints(m_pWnd->GetSafeHwnd(), HWND_DESKTOP, &point, 1);
+		CWnd* pWnd = WindowFromPoint(point);
+		
 		return (pWnd && *pWnd == *m_pWnd);
 	}
 
