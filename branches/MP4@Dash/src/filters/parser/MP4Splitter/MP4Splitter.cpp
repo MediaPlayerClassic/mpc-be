@@ -1402,10 +1402,18 @@ HRESULT CMP4SplitterFilter::CreateOutputs(IAsyncReader* pAsyncReader)
 				SetProperty(L"CPYR", copyright);
 			}
 		}
+
+		const AP4_Duration fragmentdurationms = movie->GetFragmentsDurationMs();
+		if (fragmentdurationms) {
+			// override duration from 'sidx' atom
+			const REFERENCE_TIME rtDuration = 10000i64 * fragmentdurationms;
+			m_rtDuration = rtVideoDuration = rtDuration;
+		}
 	}
 
-	if (rtVideoDuration > 0 && rtVideoDuration < m_rtDuration/2)
+	if (rtVideoDuration > 0 && rtVideoDuration < m_rtDuration / 2) {
 		m_rtDuration = rtVideoDuration; // fix incorrect duration
+	}
 
 	m_rtNewStop = m_rtStop = m_rtDuration;
 

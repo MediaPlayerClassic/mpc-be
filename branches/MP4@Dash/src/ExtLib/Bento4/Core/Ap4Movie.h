@@ -38,6 +38,7 @@
 #include "Ap4Track.h"
 #include "Ap4List.h"
 #include "Ap4ByteStream.h"
+#include "Ap4SidxAtom.h"
 
 /*----------------------------------------------------------------------
 |       AP4_Movie
@@ -59,14 +60,18 @@ public:
     AP4_UI32   GetTimeScale();
     AP4_Duration GetDuration();
     AP4_Duration GetDurationMs();
+
     bool         HasFragments();
+    AP4_Duration GetFragmentsDurationMs();
 
     void         ProcessMoof(AP4_ContainerAtom* moof, AP4_ByteStream& stream);
+    void         SetSidxAtom(AP4_SidxAtom* atom) { m_SidxAtom = atom; }
 
 private:
     // members
     AP4_MoovAtom*       m_MoovAtom;
     AP4_MvhdAtom*       m_MvhdAtom;
+    AP4_SidxAtom*       m_SidxAtom;
     AP4_List<AP4_Track> m_Tracks;
 };
 

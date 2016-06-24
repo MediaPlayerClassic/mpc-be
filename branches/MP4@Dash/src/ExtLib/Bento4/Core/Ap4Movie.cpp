@@ -40,6 +40,7 @@
 #include "Ap4MfhdAtom.h"
 #include "Ap4AtomFactory.h"
 #include "Ap4Movie.h"
+#include "Ap4Utils.h"
 
 /*----------------------------------------------------------------------
 |       AP4_TrackFinderById
@@ -78,7 +79,8 @@ private:
 /*----------------------------------------------------------------------
 |       AP4_Movie::AP4_Movie
 +---------------------------------------------------------------------*/
-AP4_Movie::AP4_Movie(AP4_UI32 time_scale)
+AP4_Movie::AP4_Movie(AP4_UI32 time_scale) :
+    m_SidxAtom(NULL)
 {
     m_MoovAtom = new AP4_MoovAtom();
     m_MvhdAtom = new AP4_MvhdAtom(0, 0, 
@@ -93,7 +95,8 @@ AP4_Movie::AP4_Movie(AP4_UI32 time_scale)
 |       AP4_Movie::AP4_Moovie
 +---------------------------------------------------------------------*/
 AP4_Movie::AP4_Movie(AP4_MoovAtom* moov, AP4_ByteStream& mdat) :
-    m_MoovAtom(moov)
+    m_MoovAtom(moov),
+    m_SidxAtom(NULL)
 {
     // ignore null atoms
     if (moov == NULL) return;
@@ -259,6 +262,24 @@ AP4_Movie::HasFragments()
     } else {
         return false;
     }
+}
+
+/*----------------------------------------------------------------------
+|   AP4_Movie::GetFragmentsDurationMs
++---------------------------------------------------------------------*/
+AP4_Duration
+AP4_Movie::GetFragmentsDurationMs()
+{
+    if (m_SidxAtom) {
+        AP4_Track* track = GetTrack(m_SidxAtom->GetReferenceId());
+        if (track) {
+            AP4_UI64 duration = m_SidxAtom->GetDuration();
+            duration = AP4_ConvertTime(duration, m_SidxAtom->GetTimeScale(), track->GetMediaTimeScale());
+            duration = AP4_ConvertTime(duration, m_SidxAtom->GetTimeScale(), 1000);
+            return duration;
+        }
+    }
+    return 0;
 }
 
 /*----------------------------------------------------------------------
