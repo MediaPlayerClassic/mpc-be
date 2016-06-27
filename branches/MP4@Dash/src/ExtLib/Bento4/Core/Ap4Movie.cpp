@@ -80,7 +80,8 @@ private:
 |       AP4_Movie::AP4_Movie
 +---------------------------------------------------------------------*/
 AP4_Movie::AP4_Movie(AP4_UI32 time_scale) :
-    m_SidxAtom(NULL)
+    m_SidxAtom(NULL),
+    m_Stream(NULL)
 {
     m_MoovAtom = new AP4_MoovAtom();
     m_MvhdAtom = new AP4_MvhdAtom(0, 0, 
@@ -96,7 +97,8 @@ AP4_Movie::AP4_Movie(AP4_UI32 time_scale) :
 +---------------------------------------------------------------------*/
 AP4_Movie::AP4_Movie(AP4_MoovAtom* moov, AP4_ByteStream& mdat) :
     m_MoovAtom(moov),
-    m_SidxAtom(NULL)
+    m_SidxAtom(NULL),
+    m_Stream(NULL)
 {
     // ignore null atoms
     if (moov == NULL) return;
