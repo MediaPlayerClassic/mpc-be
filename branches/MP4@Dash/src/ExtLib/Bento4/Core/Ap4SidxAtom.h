@@ -38,6 +38,7 @@ public:
     AP4_UI64              GetOffset()      const { return m_Offset;      }
     AP4_Duration          GetDuration()    const { return m_Duration;    }
     AP4_Array<Fragments>& GetSampleTable()       { return m_Fragments;   }
+    bool                  IsEmpty()        const { return m_Fragments.ItemCount() == 0; }
 
 private:
     // members

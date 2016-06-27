@@ -24,7 +24,7 @@ AP4_SidxAtom::AP4_SidxAtom(AP4_Size        size,
     AP4_Offset offset = 0;
     stream.Tell(offset);
     offset += size;
-    offset -= AP4_ATOM_HEADER_SIZE;
+    offset -= AP4_FULL_ATOM_HEADER_SIZE;
 
     stream.ReadUI32(m_ReferenceId);
     stream.ReadUI32(m_TimeScale);
