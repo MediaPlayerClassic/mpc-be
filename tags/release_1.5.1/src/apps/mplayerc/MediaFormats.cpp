@@ -1,0 +1,371 @@
+/*
+ * (C) 2003-2006 Gabest
+ * (C) 2006-2017 see Authors.txt
+ *
+ * This file is part of MPC-BE.
+ *
+ * MPC-BE is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * MPC-BE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "stdafx.h"
+#include "MainFrm.h"
+#include "MediaFormats.h"
+#include "OpenImage.h"
+
+//
+// CMediaFormatCategory
+//
+
+CMediaFormatCategory::CMediaFormatCategory()
+	: m_filetype(TVideo)
+{
+}
+
+CMediaFormatCategory::CMediaFormatCategory(CString label, CString description, CAtlList<CString>& exts, filetype_t filetype, CString specreqnote)
+	: m_label(label)
+	, m_description(description)
+	, m_specreqnote(specreqnote)
+	, m_filetype(filetype)
+{
+	m_exts.AddTailList(&exts);
+	m_backupexts.AddTailList(&m_exts);
+}
+
+CMediaFormatCategory::CMediaFormatCategory(CString label, CString description, CString exts, filetype_t filetype, CString specreqnote)
+	: m_label(label)
+	, m_description(description)
+	, m_specreqnote(specreqnote)
+	, m_filetype(filetype)
+{
+	ExplodeMin(exts, m_exts, ' ');
+	POSITION pos = m_exts.GetHeadPosition();
+	while (pos) {
+		m_exts.GetNext(pos).TrimLeft('.');
+	}
+
+	m_backupexts.AddTailList(&m_exts);
+}
+
+CMediaFormatCategory::~CMediaFormatCategory()
+{
+}
+
+void CMediaFormatCategory::UpdateData(bool fSave)
+{
+	if (fSave) {
+		AfxGetMyApp()->WriteProfileString(IDS_R_FILEFORMATS, m_label, GetExts());
+	} else {
+		SetExts(AfxGetMyApp()->GetProfileString(IDS_R_FILEFORMATS, m_label, GetExts()));
+	}
+}
+
+CMediaFormatCategory::CMediaFormatCategory(const CMediaFormatCategory& mfc)
+{
+	*this = mfc;
+}
+
+CMediaFormatCategory& CMediaFormatCategory::operator = (const CMediaFormatCategory& mfc)
+{
+	if (this != &mfc) {
+		m_label			= mfc.m_label;
+		m_description	= mfc.m_description;
+		m_specreqnote	= mfc.m_specreqnote;
+		m_filetype		= mfc.m_filetype;
+		m_exts.RemoveAll();
+		m_exts.AddTailList(&mfc.m_exts);
+		m_backupexts.RemoveAll();
+		m_backupexts.AddTailList(&mfc.m_backupexts);
+	}
+
+	return *this;
+}
+
+void CMediaFormatCategory::RestoreDefaultExts()
+{
+	m_exts.RemoveAll();
+	m_exts.AddTailList(&m_backupexts);
+}
+
+void CMediaFormatCategory::SetExts(CAtlList<CString>& exts)
+{
+	m_exts.RemoveAll();
+	m_exts.AddTailList(&exts);
+}
+
+void CMediaFormatCategory::SetExts(CString exts)
+{
+	m_exts.RemoveAll();
+	ExplodeMin(exts, m_exts, ' ');
+	POSITION pos = m_exts.GetHeadPosition();
+
+	while (pos) {
+		POSITION cur = pos;
+		CString& ext = m_exts.GetNext(pos);
+
+		if (ext[0] == '\\') {
+			m_exts.RemoveAt(cur);
+		} else {
+			ext.TrimLeft('.');
+		}
+	}
+}
+
+CString CMediaFormatCategory::GetFilter()
+{
+	CString filter;
+	POSITION pos = m_exts.GetHeadPosition();
+
+	while (pos) {
+		filter += L"*." + m_exts.GetNext(pos) + L";";
+	}
+
+	filter.TrimRight(';'); // cheap...
+	return(filter);
+}
+
+CString CMediaFormatCategory::GetExts()
+{
+	CString exts = Implode(m_exts, ' ');
+
+	return(exts);
+}
+
+CString CMediaFormatCategory::GetExtsWithPeriod()
+{
+	CString exts;
+	POSITION pos = m_exts.GetHeadPosition();
+
+	while (pos) {
+		exts += L"." + m_exts.GetNext(pos) + L" ";
+	}
+
+	exts.TrimRight(' ');
+
+	return(exts);
+}
+
+CString CMediaFormatCategory::GetBackupExtsWithPeriod()
+{
+	CString exts;
+	POSITION pos = m_backupexts.GetHeadPosition();
+
+	while (pos) {
+		exts += L"." + m_backupexts.GetNext(pos) + L" ";
+	}
+
+	exts.TrimRight(' ');
+
+	return(exts);
+}
+
+//
+// CMediaFormats
+//
+
+CMediaFormats::CMediaFormats()
+{
+}
+
+CMediaFormats::~CMediaFormats()
+{
+}
+
+void CMediaFormats::UpdateData(bool fSave)
+{
+	if (fSave) {
+		AfxGetMyApp()->WriteProfileString(IDS_R_FILEFORMATS, nullptr, nullptr);
+	} else {
+		RemoveAll();
+
+#define ADDFMT(f) Add(CMediaFormatCategory##f)
+		// video files
+		ADDFMT((L"avi",         ResStr(IDS_MFMT_AVI),         L"avi divx"));
+		ADDFMT((L"mpeg",        ResStr(IDS_MFMT_MPEG),        L"mpg mpeg mpe m1v m2v mpv2 mp2v pva evo m2p sfd"));
+		ADDFMT((L"mpegts",      ResStr(IDS_MFMT_MPEGTS),      L"ts tp trp m2t m2ts mts rec ssif"));
+		ADDFMT((L"dvdvideo",    ResStr(IDS_MFMT_DVDVIDEO),    L"vob ifo"));
+		ADDFMT((L"mkv",         ResStr(IDS_MFMT_MKV),         L"mkv mk3d"));
+		ADDFMT((L"webm",        ResStr(IDS_MFMT_WEBM),        L"webm"));
+		ADDFMT((L"mp4",         ResStr(IDS_MFMT_MP4),         L"mp4 m4v mp4v mpv4 hdmov ismv"));
+		ADDFMT((L"mov",         ResStr(IDS_MFMT_MOV),         L"mov"));
+		ADDFMT((L"3gp",         ResStr(IDS_MFMT_3GP),         L"3gp 3gpp 3ga"));
+		ADDFMT((L"3g2",         ResStr(IDS_MFMT_3G2),         L"3g2 3gp2"));
+		ADDFMT((L"flv",         ResStr(IDS_MFMT_FLV),         L"flv f4v"));
+		ADDFMT((L"ogm",         ResStr(IDS_MFMT_OGM),         L"ogm ogv"));
+		ADDFMT((L"rm",          ResStr(IDS_MFMT_RM),          L"rm ram rmm rmvb"));
+		ADDFMT((L"roq",         ResStr(IDS_MFMT_ROQ),         L"roq"));
+		ADDFMT((L"wmv",         ResStr(IDS_MFMT_WMV),         L"wmv wmp wm asf"));
+//		ADDFMT((L"videocd",     ResStr(IDS_MFMT_VIDEOCD),     L"dat")); // "dat" extension is no longer supported
+		ADDFMT((L"bink",        ResStr(IDS_MFMT_BINK),        L"smk bik", TVideo, L"smackw32/binkw32.dll in dll path"));
+		ADDFMT((L"flic",        ResStr(IDS_MFMT_FLIC),        L"fli flc flic"));
+		ADDFMT((L"dsm",         ResStr(IDS_MFMT_DSM),         L"dsm dsv dsa dss"));
+		ADDFMT((L"swf",         ResStr(IDS_MFMT_SWF),         L"swf", TVideo, L"ShockWave ActiveX control"));
+		ADDFMT((L"other",       ResStr(IDS_MFMT_OTHER),       L"amv wtv dvr-ms mxf ivf"));
+		ADDFMT((L"rawvideo",    ResStr(IDS_MFMT_RAW_VIDEO),   L"y4m h264 264 vc1 h265 265 hm10 hevc"));
+		// audio files
+		ADDFMT((L"ac3dts",      ResStr(IDS_MFMT_AC3),         L"ac3 dts dtshd", TAudio));
+		ADDFMT((L"aiff",        ResStr(IDS_MFMT_AIFF),        L"aif aifc aiff", TAudio));
+		ADDFMT((L"alac",        ResStr(IDS_MFMT_ALAC),        L"alac", TAudio));
+		ADDFMT((L"amr",         ResStr(IDS_MFMT_AMR),         L"amr awb", TAudio));
+		ADDFMT((L"ape",         ResStr(IDS_MFMT_APE),         L"ape apl", TAudio));
+		ADDFMT((L"au",          ResStr(IDS_MFMT_AU),          L"au snd", TAudio));
+		ADDFMT((L"audiocd",     ResStr(IDS_MFMT_CDA),         L"cda", TAudio));
+		ADDFMT((L"dvdaudio",    ResStr(IDS_MFMT_DVDAUDIO),    L"aob", TAudio));
+		ADDFMT((L"dsd",         ResStr(IDS_MFMT_DSD),         L"dsf dff", TAudio));
+		ADDFMT((L"flac",        ResStr(IDS_MFMT_FLAC),        L"flac", TAudio));
+		ADDFMT((L"m4a",         ResStr(IDS_MFMT_M4A),         L"m4a m4b aac", TAudio));
+		ADDFMT((L"midi",        ResStr(IDS_MFMT_MIDI),        L"mid midi rmi", TAudio));
+		ADDFMT((L"mka",         ResStr(IDS_MFMT_MKA),         L"mka", TAudio));
+		ADDFMT((L"mlp",         ResStr(IDS_MFMT_MLP),         L"mlp", TAudio));
+		ADDFMT((L"mp3",         ResStr(IDS_MFMT_MP3),         L"mp3", TAudio));
+		ADDFMT((L"mpa",         ResStr(IDS_MFMT_MPA),         L"mpa mp2 m1a m2a", TAudio));
+		ADDFMT((L"mpc",         ResStr(IDS_MFMT_MPC),         L"mpc", TAudio));
+		ADDFMT((L"ofr",         ResStr(IDS_MFMT_OFR),         L"ofr ofs", TAudio));
+		ADDFMT((L"ogg",         ResStr(IDS_MFMT_OGG),         L"ogg oga", TAudio));
+		ADDFMT((L"ra",          ResStr(IDS_MFMT_RA),          L"ra", TAudio));
+		ADDFMT((L"tak",         ResStr(IDS_MFMT_TAK),         L"tak", TAudio));
+		ADDFMT((L"tta",         ResStr(IDS_MFMT_TTA),         L"tta", TAudio));
+		ADDFMT((L"wav",         ResStr(IDS_MFMT_WAV),         L"wav w64", TAudio));
+		ADDFMT((L"wma",         ResStr(IDS_MFMT_WMA),         L"wma", TAudio));
+		ADDFMT((L"wavpack",     ResStr(IDS_MFMT_WAVPACK),     L"wv", TAudio));
+		ADDFMT((L"opus",        ResStr(IDS_MFMT_OPUS),        L"opus", TAudio));
+		ADDFMT((L"speex",       ResStr(IDS_MFMT_SPEEX),       L"spx", TAudio));
+		// playlists
+		ADDFMT((L"pls",         ResStr(IDS_MFMT_PLS),         L"asx m3u m3u8 pls wpl mpcpl xspf", TPlaylist));
+		ADDFMT((L"bdpls",       ResStr(IDS_MFMT_BDPLS),       L"mpls bdmv", TVideo)); // opens as a video file
+		ADDFMT((L"cue",         ResStr(IDS_MFMT_CUE),         L"cue", TPlaylist));
+#undef ADDFMT
+	}
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		GetAt(i).UpdateData(fSave);
+	}
+}
+
+bool CMediaFormats::FindExt(CString ext)
+{
+	return (FindMediaByExt(ext) != nullptr);
+}
+
+bool CMediaFormats::FindAudioExt(CString ext)
+{
+	CMediaFormatCategory* pmfc = FindMediaByExt(ext);
+	return (pmfc && pmfc->GetFileType() == TAudio);
+}
+
+CMediaFormatCategory* CMediaFormats::FindMediaByExt(CString ext)
+{
+	ext.TrimLeft('.');
+
+	if (!ext.IsEmpty()) {
+		for (size_t i = 0; i < GetCount(); i++) {
+			CMediaFormatCategory& mfc = GetAt(i);
+			if (mfc.FindExt(ext)) {
+				return &mfc;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+void CMediaFormats::GetFilter(CString& filter, CAtlArray<CString>& mask)
+{
+	CString strTemp;
+
+	// Add All Media formats
+	filter += ResStr(IDS_AG_MEDIAFILES);
+	mask.Add(L"");
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		strTemp = GetAt(i).GetFilter() + L";";
+		mask[0] += strTemp;
+		filter += strTemp;
+	}
+	mask[0].TrimRight(';');
+	filter.TrimRight(';');
+	filter += L"|";
+
+	// Add Video formats
+	filter += ResStr(IDS_AG_VIDEOFILES);
+	mask.Add(L"");
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		if (GetAt(i).GetFileType() == TVideo) {
+			strTemp = GetAt(i).GetFilter() + L";";
+			mask[1] += strTemp;
+			filter += strTemp;
+		}
+	}
+	filter.TrimRight(';');
+	filter += L"|";
+
+	// Add Audio formats
+	filter += ResStr(IDS_AG_AUDIOFILES);
+	mask.Add(L"");
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		if (GetAt(i).GetFileType() == TAudio) {
+			strTemp = GetAt(i).GetFilter() + L";";
+			mask[1] += strTemp;
+			filter += strTemp;
+		}
+	}
+	filter.TrimRight(';');
+	filter += L"|";
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		CMediaFormatCategory& mfc = GetAt(i);
+		filter += mfc.GetDescription() + L"|" + GetAt(i).GetFilter() + L"|";
+		mask.Add(mfc.GetFilter());
+	}
+
+	filter += ResStr(IDS_AG_ALLFILES);
+	mask.Add(L"*.*");
+
+	filter += L"|";
+}
+
+void CMediaFormats::GetAudioFilter(CString& filter, CAtlArray<CString>& mask)
+{
+	CString		strTemp;
+	filter += ResStr(IDS_AG_AUDIOFILES);
+	mask.Add(L"");
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		CMediaFormatCategory& mfc = GetAt(i);
+		if (mfc.GetFileType() == TAudio) {
+			strTemp = GetAt(i).GetFilter() + L";";
+			mask[0] += strTemp;
+			filter += strTemp;
+		}
+	}
+
+	mask[0].TrimRight(';');
+	filter.TrimRight(';');
+	filter += L"|";
+
+	for (size_t i = 0; i < GetCount(); i++) {
+		CMediaFormatCategory& mfc = GetAt(i);
+		if (mfc.GetFileType() == TAudio) {
+			filter += mfc.GetDescription() + L"|" + GetAt(i).GetFilter() + L"|";
+			mask.Add(mfc.GetFilter());
+		}
+	}
+
+	filter += ResStr(IDS_AG_ALLFILES);
+	mask.Add(L"*.*");
+
+	filter += L"|";
+}
