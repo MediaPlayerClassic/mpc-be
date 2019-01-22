@@ -666,6 +666,8 @@ public:
 	CString			strFSMonOnLaunch;
 	int				iDMChangeDelay;
 
+	CString strTabs;
+
 	// Sync Renderer Settings
 
 	// Capture (BDA configuration)
@@ -825,7 +827,6 @@ public:
 	// Playlist (contex menu)
 	bool			bShufflePlaylistItems;
 	bool			bHidePlaylistFullScreen;
-
 	// OTHER STATES
 	CString			strLastOpenDir;
 	CString			strLastSavedPlaylistDir;

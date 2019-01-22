@@ -262,6 +262,7 @@ BOOL CPPageInterface::OnApply()
 	pFrame->m_wndPlaylistBar.m_bUseDarkTheme = s.bUseDarkTheme;
 	if (pFrame->m_wndPlaylistBar.IsWindowVisible()) {
 		pFrame->m_wndPlaylistBar.SendMessageW(WM_NCPAINT, 1, NULL);
+		pFrame->m_wndPlaylistBar.TSetColor();
 	}
 
 	pFrame->ResetMenu();

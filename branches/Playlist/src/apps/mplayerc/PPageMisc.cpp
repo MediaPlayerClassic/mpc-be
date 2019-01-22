@@ -20,6 +20,7 @@
 
 #include "stdafx.h"
 #include "MiniDump.h"
+#include "MainFrm.h"
 #include "PPageMisc.h"
 
 // CPPageMisc dialog
@@ -147,6 +148,8 @@ void CPPageMisc::OnResetSettings()
 {
 	if (MessageBoxW(ResStr(IDS_RESET_SETTINGS_WARNING), ResStr(IDS_RESET_SETTINGS), MB_ICONEXCLAMATION | MB_YESNO | MB_DEFBUTTON2) == IDYES) {
 		AfxGetAppSettings().bResetSettings = true;
+		auto pFrame = AfxGetMainFrame();
+		pFrame->m_wndPlaylistBar.TDeleteAllPlaylists();
 		GetParent()->PostMessageW(WM_CLOSE);
 	}
 }

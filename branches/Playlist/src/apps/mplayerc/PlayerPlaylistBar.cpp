@@ -32,7 +32,7 @@
 #include "PlayerPlaylistBar.h"
 #include "OpenDlg.h"
 #include "Content.h"
-
+#include "PlaylistNameDlg.h"
 #include <coolsb/coolscroll.h>
 #include "./Controls/MenuEx.h"
 
@@ -216,6 +216,20 @@ bool CPlaylistItem::FindFile(LPCTSTR path)
 {
 	for (const auto& fi : m_fns) {
 		if (fi.GetName().CompareNoCase(path) == 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool CPlaylistItem::FindFolder(LPCTSTR path)
+{
+	for (const auto& fi : m_fns) {
+		CString str = fi.GetName();
+		str.TrimRight(L">");
+		str.TrimRight(L"<");
+		if (str.CompareNoCase(path) == 0) {
 			return true;
 		}
 	}
@@ -720,11 +734,29 @@ CPlayerPlaylistBar::CPlayerPlaylistBar(CMainFrame* pMainFrame)
 	, m_bHiddenDueToFullscreen(false)
 	, m_bVisible(false)
 {
-	m_bUseDarkTheme = AfxGetAppSettings().bUseDarkTheme;
+	CAppSettings& s = AfxGetAppSettings();
+	m_bUseDarkTheme = s.bUseDarkTheme;
+	TSetColor();
+
+	cntOffset = 0;
+	m_nCurPlayListIndex = 0;
+
+	TGetSettings();
+
+	rcTPage.SetRect(0, 0, 0, 0);
+	TCalcLayout();
 }
 
 CPlayerPlaylistBar::~CPlayerPlaylistBar()
 {
+	TEnsureVisible(m_nCurPlayListIndex); // save selected tab visible
+	TSaveSettings();
+
+	tabs.erase(tabs.begin(), tabs.end());
+
+	for (auto& pl : m_pls) {
+		SAFE_DELETE(pl);
+	}
 }
 
 BOOL CPlayerPlaylistBar::Create(CWnd* pParentWnd, UINT defDockBarID)
@@ -793,6 +825,7 @@ void CPlayerPlaylistBar::ScaleFont()
 {
 	ScaleFontInternal();
 	ResizeListColumn();
+	TCalcLayout();
 }
 
 BOOL CPlayerPlaylistBar::PreCreateWindow(CREATESTRUCT& cs)
@@ -814,11 +847,14 @@ BOOL CPlayerPlaylistBar::PreTranslateMessage(MSG* pMsg)
 			case VK_ESCAPE:
 				GetParentFrame()->ShowControlBar(this, FALSE, TRUE);
 				return TRUE;
+			case VK_SPACE:
 			case VK_RETURN:
 				if (m_list.GetSelectedCount() == 1) {
+					if (TNavigate()) {
+						break;// return FALSE;
+					}
 					const int item = m_list.GetNextItem(-1, LVNI_SELECTED);
-
-					m_pl.SetPos(FindPos(item));
+					curPlayList.SetPos(FindPos(item));
 					m_pMainFrame->OpenCurPlaylistItem();
 					AfxGetMainWnd()->SetFocus();
 
@@ -844,6 +880,9 @@ BOOL CPlayerPlaylistBar::PreTranslateMessage(MSG* pMsg)
 			case VK_PRIOR:
 			case VK_NEXT:
 			case VK_DELETE:
+				if (pMsg->wParam == VK_DELETE && TGetPlaylistType() == EXPLORER) {
+					return TRUE;
+				}
 			case VK_APPS: // "Menu key"
 				break;
 			default:
@@ -942,7 +981,7 @@ void CPlayerPlaylistBar::AddItem(std::list<CString>& fns, CSubtitleItemList* sub
 		}
 	}
 
-	m_pl.AddTail(pli);
+	curPlayList.AddTail(pli);
 }
 
 static bool SearchFiles(CString path, std::list<CString>& sl, bool bSingleElement)
@@ -1115,13 +1154,13 @@ void CPlayerPlaylistBar::ParsePlayList(std::list<CString>& fns, CSubtitleItemLis
 
 			CString empty, label;
 			m_pMainFrame->MakeBDLabel(fn, empty, &label);
-			m_pl.GetTail().m_label = label;
+			curPlayList.GetTail().m_label = label;
 			return;
 		} else if (m_pMainFrame->CheckDVD(fn)) {
 			AddItem(fns, subs);
 			CString empty, label;
 			m_pMainFrame->MakeDVDLabel(fn, empty, &label);
-			m_pl.GetTail().m_label = label;
+			curPlayList.GetTail().m_label = label;
 			return;
 		} else if (ct == L"application/x-mpc-playlist") {
 			ParseMPCPlayList(fn);
@@ -1168,7 +1207,6 @@ static CString CombinePath(CPath p, CString fn)
 
 bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 {
-	m_nSelected_idx = INT_MAX;
 
 	CString str;
 	std::map<int, CPlaylistItem> pli;
@@ -1177,6 +1215,10 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 
 	CWebTextFile f(CTextFile::UTF8, CTextFile::ANSI);
 	if (!f.Open(fn) || !f.ReadString(str) || str != L"MPCPLAYLIST" || f.GetLength() > MEGABYTE) {
+		if (tabs[m_nCurPlayListIndex].type == EXPLORER) {
+			CString path = L".\\";
+			TParseFolder(path);
+		}
 		return false;
 	}
 
@@ -1209,7 +1251,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 					selected_idx = i - 1;
 				}
 			} else if (key == L"filename") {
-				value = MakePath(CombinePath(base, value));
+				value = TGetPlaylistType() == 0 ? MakePath(CombinePath(base, value)) : value;
 				pli[i].m_fns.push_back(value);
 			} else if (key == L"subtitle") {
 				value = CombinePath(base, value);
@@ -1236,16 +1278,21 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 		}
 	}
 
-	const BOOL bIsEmpty = m_pl.IsEmpty();
+	const BOOL bIsEmpty = curPlayList.IsEmpty();
 
 	std::sort(idx.begin(), idx.end());
 
 	for (size_t i = 0; i < idx.size(); i++) {
-		m_pl.AddTail(pli[idx[i]]);
+		curPlayList.AddTail(pli[idx[i]]);
 	}
 
-	if (bIsEmpty && selected_idx >= 0 && selected_idx < m_pl.GetCount()) {
-		m_nSelected_idx = selected_idx - 1;
+	if (tabs[m_nCurPlayListIndex].type == EXPLORER && curPlayList.IsEmpty()) {
+		CString path = L".\\";
+		TParseFolder(path);
+	}
+
+	if (bIsEmpty && selected_idx >= 0 && selected_idx < curPlayList.GetCount()) {
+		curPlayList.m_nSelected_idx = selected_idx - 1;
 	}
 
 	return pli.size() > 0;
@@ -1260,12 +1307,12 @@ bool CPlayerPlaylistBar::SaveMPCPlayList(CString fn, CTextFile::enc e, bool fRem
 
 	f.WriteString(L"MPCPLAYLIST\n");
 
-	POSITION cur_pos = m_pl.GetPos();
+	POSITION cur_pos = curPlayList.GetPos();
 
-	POSITION pos = m_pl.GetHeadPosition();
+	POSITION pos = curPlayList.GetHeadPosition();
 	for (int i = 1; pos; i++) {
-		bool selected = (cur_pos == pos) && (m_pl.GetCount() > 1);
-		CPlaylistItem& pli = m_pl.GetNext(pos);
+		bool selected = (cur_pos == pos) && (curPlayList.GetCount() > 1);
+		CPlaylistItem& pli = curPlayList.GetNext(pos);
 
 		CString idx;
 		idx.Format(L"%d", i);
@@ -1341,7 +1388,7 @@ bool CPlayerPlaylistBar::ParseM3UPlayList(CString fn)
 
 	CPlaylistItem *pli = nullptr;
 
-	INT_PTR c = m_pl.GetCount();
+	INT_PTR c = curPlayList.GetCount();
 	CString str;
 	while (f.ReadString(str)) {
 		str = str.Trim();
@@ -1384,7 +1431,7 @@ bool CPlayerPlaylistBar::ParseM3UPlayList(CString fn)
 			}
 
 			pli->m_fns.push_back(MakePath(CombinePath(base, str)));
-			m_pl.AddTail(*pli);
+			curPlayList.AddTail(*pli);
 
 			SAFE_DELETE(pli);
 		}
@@ -1392,7 +1439,7 @@ bool CPlayerPlaylistBar::ParseM3UPlayList(CString fn)
 
 	SAFE_DELETE(pli);
 
-	return (m_pl.GetCount() > c);
+	return (curPlayList.GetCount() > c);
 }
 
 bool CPlayerPlaylistBar::ParseCUEPlayList(CString fn)
@@ -1413,7 +1460,7 @@ bool CPlayerPlaylistBar::ParseCUEPlayList(CString fn)
 	CPath base(fn);
 	base.RemoveFileSpec();
 
-	INT_PTR c = m_pl.GetCount();
+	INT_PTR c = curPlayList.GetCount();
 
 	for (const auto& fName : fileNames){
 		CString fullPath = MakePath(CombinePath(base, fName));
@@ -1478,11 +1525,11 @@ bool CPlayerPlaylistBar::ParseCUEPlayList(CString fn)
 
 			pli.m_fns.push_front(fi);
 
-			m_pl.AddTail(pli);
+			curPlayList.AddTail(pli);
 		}
 	}
 
-	return (m_pl.GetCount() > c);
+	return (curPlayList.GetCount() > c);
 }
 
 void CPlayerPlaylistBar::Refresh()
@@ -1493,7 +1540,7 @@ void CPlayerPlaylistBar::Refresh()
 
 bool CPlayerPlaylistBar::Empty()
 {
-	bool bWasPlaying = m_pl.RemoveAll();
+	bool bWasPlaying = curPlayList.RemoveAll();
 	m_list.DeleteAllItems();
 	SavePlaylist();
 
@@ -1515,7 +1562,7 @@ void CPlayerPlaylistBar::Remove(const std::vector<int>& items, const bool bDelet
 			POSITION pos = FindPos(items[i]);
 
 			if (bDelete) {
-				const auto item = m_pl.GetAt(pos);
+				const auto item = curPlayList.GetAt(pos);
 				for (const auto& fn : item.m_fns) {
 					if (::PathFileExistsW(fn)) {
 						fns.emplace_back(fn);
@@ -1528,7 +1575,7 @@ void CPlayerPlaylistBar::Remove(const std::vector<int>& items, const bool bDelet
 				}
 			}
 
-			if (m_pl.RemoveAt(pos)) {
+			if (curPlayList.RemoveAt(pos)) {
 				m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
 			}
 			m_list.DeleteItem(items[i]);
@@ -1577,6 +1624,9 @@ void CPlayerPlaylistBar::Open(CString fn)
 void CPlayerPlaylistBar::Open(std::list<CString>& fns, bool fMulti, CSubtitleItemList* subs/* = nullptr*/, bool bCheck/* = true*/)
 {
 	ResolveLinkFiles(fns);
+	m_nCurPlayListIndex = 0;
+	TSaveSettings();
+	TDrawBar();
 	Empty();
 	Append(fns, fMulti, subs, bCheck);
 }
@@ -1590,7 +1640,7 @@ void CPlayerPlaylistBar::Append(CString fn)
 
 void CPlayerPlaylistBar::Append(std::list<CString>& fns, bool fMulti, CSubtitleItemList* subs/* = nullptr*/, bool bCheck/* = true*/)
 {
-	const INT_PTR idx = m_pl.GetCount();
+	const INT_PTR idx = curPlayList.GetCount();
 
 	if (fMulti) {
 		ASSERT(subs == nullptr || subs->size() == 0);
@@ -1603,7 +1653,7 @@ void CPlayerPlaylistBar::Append(std::list<CString>& fns, bool fMulti, CSubtitleI
 	}
 
 	Refresh();
-	EnsureVisible(m_pl.FindIndex(m_nSelected_idx != INT_MAX ? m_nSelected_idx + 1 : idx));
+	EnsureVisible(curPlayList.FindIndex(curPlayList.m_nSelected_idx != INT_MAX ? curPlayList.m_nSelected_idx + 1 : idx));
 	if (!idx && AfxGetAppSettings().bShufflePlaylistItems && GetCount() > 2) {
 		SetNext();
 	}
@@ -1611,22 +1661,22 @@ void CPlayerPlaylistBar::Append(std::list<CString>& fns, bool fMulti, CSubtitleI
 
 	UpdateList();
 
-	m_nSelected_idx = INT_MAX;
+	curPlayList.m_nSelected_idx = INT_MAX;
 }
 
 void CPlayerPlaylistBar::Append(CFileItemList& fis)
 {
-	const INT_PTR idx = m_pl.GetCount();
+	const INT_PTR idx = curPlayList.GetCount();
 
 	for (const auto& fi : fis) {
 		CPlaylistItem pli;
 		pli.m_fns.push_front(fi.GetName());
 		pli.m_label = fi.GetTitle();
-		m_pl.AddTail(pli);
+		curPlayList.AddTail(pli);
 	}
 
 	Refresh();
-	EnsureVisible(m_pl.FindIndex(idx + 1));
+	EnsureVisible(curPlayList.FindIndex(idx + 1));
 	SavePlaylist();
 
 	UpdateList();
@@ -1634,7 +1684,7 @@ void CPlayerPlaylistBar::Append(CFileItemList& fis)
 
 bool CPlayerPlaylistBar::Replace(CString filename, std::list<CString>& fns)
 {
-	if (filename.IsEmpty()) {
+	if (filename.IsEmpty() || tabs[m_nCurPlayListIndex].type == EXPLORER) {
 		return false;
 	}
 
@@ -1646,16 +1696,16 @@ bool CPlayerPlaylistBar::Replace(CString filename, std::list<CString>& fns)
 	}
 	pli.AutoLoadFiles();
 
-	POSITION pos = m_pl.GetHeadPosition();
+	POSITION pos = curPlayList.GetHeadPosition();
 	while (pos) {
-		CPlaylistItem& pli2 = m_pl.GetAt(pos);
+		CPlaylistItem& pli2 = curPlayList.GetAt(pos);
 		if (pli2.FindFile(filename)) {
-			m_pl.SetAt(pos, pli);
-			m_pl.SetPos(pos);
+			curPlayList.SetAt(pos, pli);
+			curPlayList.SetPos(pos);
 			EnsureVisible(pos, false);
 			return true;
 		}
-		m_pl.GetNext(pos);
+		curPlayList.GetNext(pos);
 	}
 	return false;
 }
@@ -1687,10 +1737,10 @@ void CPlayerPlaylistBar::Append(CStringW vdn, CStringW adn, int vinput, int vcha
 	CStringW label = Implode(sl, '|');
 	label.Replace(L"|", L" - ");
 	pli.m_label = CString(label);
-	m_pl.AddTail(pli);
+	curPlayList.AddTail(pli);
 
 	Refresh();
-	EnsureVisible(m_pl.GetTailPosition());
+	EnsureVisible(curPlayList.GetTailPosition());
 	SavePlaylist();
 }
 
@@ -1698,24 +1748,24 @@ void CPlayerPlaylistBar::SetupList()
 {
 	m_list.DeleteAllItems();
 
-	POSITION pos = m_pl.GetHeadPosition();
+	POSITION pos = curPlayList.GetHeadPosition();
 	for (int i = 0; pos; i++) {
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		m_list.SetItemData(m_list.InsertItem(i, pli.GetLabel()), (DWORD_PTR)pos);
 		m_list.SetItemText(i, COL_TIME, pli.GetLabel(1));
-		m_pl.GetNext(pos);
+		curPlayList.GetNext(pos);
 	}
 }
 
 void CPlayerPlaylistBar::UpdateList()
 {
-	POSITION pos = m_pl.GetHeadPosition();
+	POSITION pos = curPlayList.GetHeadPosition();
 	for (int i = 0, j = m_list.GetItemCount(); pos && i < j; i++) {
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		m_list.SetItemData(i, (DWORD_PTR)pos);
 		m_list.SetItemText(i, COL_NAME, pli.GetLabel(0));
 		m_list.SetItemText(i, COL_TIME, pli.GetLabel(1));
-		m_pl.GetNext(pos);
+		curPlayList.GetNext(pos);
 	}
 }
 
@@ -1751,18 +1801,18 @@ POSITION CPlayerPlaylistBar::FindPos(int i)
 
 int CPlayerPlaylistBar::GetCount()
 {
-	return m_pl.GetCount();
+	return curPlayList.GetCount();
 }
 
 int CPlayerPlaylistBar::GetSelIdx()
 {
-	return FindItem(m_pl.GetPos());
+	return FindItem(curPlayList.GetPos());
 }
 
 void CPlayerPlaylistBar::SetSelIdx(int i, bool bUpdatePos/* = false*/)
 {
 	POSITION pos = FindPos(i);
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	if (bUpdatePos) {
 		EnsureVisible(pos, false);
 	}
@@ -1770,13 +1820,13 @@ void CPlayerPlaylistBar::SetSelIdx(int i, bool bUpdatePos/* = false*/)
 
 bool CPlayerPlaylistBar::IsAtEnd()
 {
-	POSITION pos = m_pl.GetPos(), tail = m_pl.GetTailPosition();
+	POSITION pos = curPlayList.GetPos(), tail = curPlayList.GetTailPosition();
 	bool isAtEnd = (pos && pos == tail);
 
 	if (!isAtEnd && pos) {
-		isAtEnd = m_pl.GetNextWrap(pos).m_fInvalid;
+		isAtEnd = curPlayList.GetNextWrap(pos).m_fInvalid;
 		while (isAtEnd && pos && pos != tail) {
-			isAtEnd = m_pl.GetNextWrap(pos).m_fInvalid;
+			isAtEnd = curPlayList.GetNextWrap(pos).m_fInvalid;
 		}
 	}
 
@@ -1785,16 +1835,16 @@ bool CPlayerPlaylistBar::IsAtEnd()
 
 bool CPlayerPlaylistBar::GetCur(CPlaylistItem& pli)
 {
-	if (!m_pl.GetPos()) {
+	if (!curPlayList.GetPos()) {
 		return false;
 	}
-	pli = m_pl.GetAt(m_pl.GetPos());
+	pli = curPlayList.GetAt(curPlayList.GetPos());
 	return true;
 }
 
 CPlaylistItem* CPlayerPlaylistBar::GetCur()
 {
-	return !m_pl.GetPos() ? nullptr : &m_pl.GetAt(m_pl.GetPos());
+	return !curPlayList.GetPos() ? nullptr : &curPlayList.GetAt(curPlayList.GetPos());
 }
 
 CString CPlayerPlaylistBar::GetCurFileName()
@@ -1809,12 +1859,12 @@ CString CPlayerPlaylistBar::GetCurFileName()
 
 bool CPlayerPlaylistBar::SetNext()
 {
-	POSITION pos = m_pl.GetPos(), org = pos;
-	while (m_pl.GetNextWrap(pos).m_fInvalid && pos != org) {
+	POSITION pos = curPlayList.GetPos(), org = pos;
+	while (curPlayList.GetNextWrap(pos).m_fInvalid && pos != org) {
 		;
 	}
 	UpdateList();
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	EnsureVisible(pos);
 
 	return (pos != org);
@@ -1822,11 +1872,11 @@ bool CPlayerPlaylistBar::SetNext()
 
 bool CPlayerPlaylistBar::SetPrev()
 {
-	POSITION pos = m_pl.GetPos(), org = pos;
-	while (m_pl.GetPrevWrap(pos).m_fInvalid && pos != org) {
+	POSITION pos = curPlayList.GetPos(), org = pos;
+	while (curPlayList.GetPrevWrap(pos).m_fInvalid && pos != org) {
 		;
 	}
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	EnsureVisible(pos);
 
 	return (pos != org);
@@ -1838,69 +1888,69 @@ void CPlayerPlaylistBar::SetFirstSelected()
 	if (pos) {
 		pos = FindPos(m_list.GetNextSelectedItem(pos));
 	} else {
-		pos = m_pl.GetTailPosition();
+		pos = curPlayList.GetTailPosition();
 		POSITION org = pos;
-		while (m_pl.GetNextWrap(pos).m_fInvalid && pos != org) {
+		while (curPlayList.GetNextWrap(pos).m_fInvalid && pos != org) {
 			;
 		}
 	}
 	UpdateList();
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	EnsureVisible(pos);
 }
 
 void CPlayerPlaylistBar::SetFirst()
 {
-	POSITION pos = m_pl.GetTailPosition(), org = pos;
-	while (m_pl.GetNextWrap(pos).m_fInvalid && pos != org) {
+	POSITION pos = curPlayList.GetTailPosition(), org = pos;
+	while (curPlayList.GetNextWrap(pos).m_fInvalid && pos != org) {
 		;
 	}
 	UpdateList();
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	EnsureVisible(pos);
 }
 
 void CPlayerPlaylistBar::SetLast()
 {
-	POSITION pos = m_pl.GetHeadPosition(), org = pos;
-	while (m_pl.GetPrevWrap(pos).m_fInvalid && pos != org) {
+	POSITION pos = curPlayList.GetHeadPosition(), org = pos;
+	while (curPlayList.GetPrevWrap(pos).m_fInvalid && pos != org) {
 		;
 	}
-	m_pl.SetPos(pos);
+	curPlayList.SetPos(pos);
 	EnsureVisible(pos);
 }
 
 void CPlayerPlaylistBar::SetCurValid(bool fValid)
 {
-	POSITION pos = m_pl.GetPos();
+	POSITION pos = curPlayList.GetPos();
 	if (pos) {
-		m_pl.GetAt(pos).m_fInvalid = !fValid;
+		curPlayList.GetAt(pos).m_fInvalid = !fValid;
 	}
 	UpdateList();
 }
 
 void CPlayerPlaylistBar::SetCurLabel(CString label)
 {
-	POSITION pos = m_pl.GetPos();
+	POSITION pos = curPlayList.GetPos();
 	if (pos) {
-		m_pl.GetAt(pos).m_label = label;
+		curPlayList.GetAt(pos).m_label = label;
 	}
 	UpdateList();
 }
 
 void CPlayerPlaylistBar::Randomize()
 {
-	m_pl.Randomize();
+	curPlayList.Randomize();
 	SetupList();
 	SavePlaylist();
-	EnsureVisible(m_pl.GetPos(), true);
+	EnsureVisible(curPlayList.GetPos(), true);
 }
 
 void CPlayerPlaylistBar::SetCurTime(REFERENCE_TIME rt)
 {
-	POSITION pos = m_pl.GetPos();
+	POSITION pos = curPlayList.GetPos();
 	if (pos) {
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		pli.m_duration = rt;
 		m_list.SetItemText(FindItem(pos), COL_TIME, pli.GetLabel(1));
 	}
@@ -1917,6 +1967,9 @@ OpenMediaData* CPlayerPlaylistBar::GetCurOMD(REFERENCE_TIME rtStart)
 	pli->AutoLoadFiles();
 
 	CString fn = pli->m_fns.front().GetName().MakeLower();
+
+	if (fn.Right(1) == L">" || fn.Right(1) == L"<" || fn.Right(1) == L":")
+		return nullptr;
 
 	if (fn.Find(L"video_ts.ifo") >= 0
 			|| fn.Find(L".ratdvd") >= 0) {
@@ -1956,49 +2009,68 @@ bool CPlayerPlaylistBar::SelectFileInPlaylist(CString filename)
 	if (filename.IsEmpty()) {
 		return false;
 	}
-	POSITION pos = m_pl.GetHeadPosition();
+	POSITION pos = curPlayList.GetHeadPosition();
 	while (pos) {
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		if (pli.FindFile(filename)) {
-			m_pl.SetPos(pos);
+			curPlayList.SetPos(pos);
 			EnsureVisible(pos, false);
 			return true;
 		}
-		m_pl.GetNext(pos);
+		curPlayList.GetNext(pos);
 	}
 	return false;
 }
 
 void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 {
-	CString base;
+	int curpl = m_nCurPlayListIndex;
+	for (size_t i = 0; i < tabs.size(); i++) {
+		if (tabs[i].type == BUTTON) 
+			continue;
+		m_nCurPlayListIndex = i;
+		CString base;
+		if (AfxGetMyApp()->GetAppSavePath(base)) {
+			base.Append(tabs[i].fn);
 
-	if (AfxGetMyApp()->GetAppSavePath(base)) {
-		base.Append(L"default.mpcpl");
+			if (::PathFileExistsW(base)) {
+				if (AfxGetAppSettings().bRememberPlaylistItems) {
+					ParseMPCPlayList(base);
 
-		if (::PathFileExistsW(base)) {
-			if (AfxGetAppSettings().bRememberPlaylistItems) {
-				ParseMPCPlayList(base);
-				Refresh();
-				if (m_nSelected_idx != INT_MAX) {
-					SetSelIdx(m_nSelected_idx + 1, true);
-					m_nSelected_idx = INT_MAX;
-				} else {
-					SelectFileInPlaylist(filename);
+
 				}
-			} else {
-				::DeleteFileW(base);
+				else {
+					::DeleteFileW(base);
+				}
+			}
+			else if (tabs[i].type == EXPLORER) {
+				TParseFolder(L".\\");
 			}
 		}
 	}
+	m_nCurPlayListIndex = curpl;
+
+	Refresh();
+
+	if (curPlayList.m_nSelected_idx != INT_MAX) {
+		SetSelIdx(curPlayList.m_nSelected_idx + 1, true);
+		curPlayList.m_nSelected_idx = INT_MAX;
+	}
+	else {
+		SelectFileInPlaylist(filename);
+	}
+
+	TDrawBar();
 }
 
 void CPlayerPlaylistBar::SavePlaylist()
 {
+	if (tabs[m_nCurPlayListIndex].type == 2)
+		return;
 	CString base;
 
 	if (AfxGetMyApp()->GetAppSavePath(base)) {
-		CString file = base + L"default.mpcpl";
+		CString file = base + tabs[m_nCurPlayListIndex].fn;
 
 		if (AfxGetAppSettings().bRememberPlaylistItems) {
 			// Only create this folder when needed
@@ -2011,6 +2083,7 @@ void CPlayerPlaylistBar::SavePlaylist()
 			::DeleteFileW(file);
 		}
 	}
+	TSaveSettings();
 }
 
 BEGIN_MESSAGE_MAP(CPlayerPlaylistBar, CSizingControlBarG)
@@ -2023,6 +2096,10 @@ BEGIN_MESSAGE_MAP(CPlayerPlaylistBar, CSizingControlBarG)
 	ON_COMMAND_EX(ID_PLAY_PLAY, OnPlayPlay)
 	ON_NOTIFY(LVN_BEGINDRAG, IDC_PLAYLIST, OnBeginDrag)
 	ON_WM_MOUSEMOVE()
+	ON_WM_PAINT()
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONDBLCLK()
+	ON_WM_MOUSELEAVE()
 	ON_WM_LBUTTONUP()
 	ON_NOTIFY_EX_RANGE(TTN_NEEDTEXT, 0, 0xFFFF, OnToolTipNotify)
 	ON_WM_TIMER()
@@ -2040,6 +2117,8 @@ void CPlayerPlaylistBar::ResizeListColumn()
 		CRect r;
 		GetClientRect(r);
 		r.DeflateRect(2, 2);
+		r.top += abs(iTFontSize)*2;
+
 		m_list.SetRedraw(FALSE);
 		m_list.MoveWindow(r);
 		m_list.GetClientRect(r);
@@ -2059,6 +2138,8 @@ void CPlayerPlaylistBar::ResizeListColumn()
 
 			GetClientRect(r);
 			r.DeflateRect(2, 2);
+			r.top += abs(iTFontSize)*2;
+
 			m_list.SetRedraw(FALSE);
 			m_list.MoveWindow(r);
 			m_list.GetClientRect(r);
@@ -2087,6 +2168,7 @@ void CPlayerPlaylistBar::OnSize(UINT nType, int cx, int cy)
 	CSizingControlBarG::OnSize(nType, cx, cy);
 
 	ResizeListColumn();
+	TCalcLayout();
 }
 
 void CPlayerPlaylistBar::OnLvnKeyDown(NMHDR* pNMHDR, LRESULT* pResult)
@@ -2107,7 +2189,7 @@ void CPlayerPlaylistBar::OnLvnKeyDown(NMHDR* pNMHDR, LRESULT* pResult)
 
 		*pResult = TRUE;
 	} else if (pLVKeyDown->wVKey == VK_SPACE && items.size() == 1) {
-		m_pl.SetPos(FindPos(items.front()));
+		curPlayList.SetPos(FindPos(items.front()));
 		m_pMainFrame->OpenCurPlaylistItem();
 		AfxGetMainWnd()->SetFocus();
 
@@ -2118,24 +2200,58 @@ void CPlayerPlaylistBar::OnLvnKeyDown(NMHDR* pNMHDR, LRESULT* pResult)
 void CPlayerPlaylistBar::OnNMDblclkList(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMLISTVIEW lpnmlv = (LPNMLISTVIEW)pNMHDR;
+	if (TGetPlaylistType() == PLAYLIST) {
+		if (lpnmlv->iItem >= 0 && lpnmlv->iSubItem >= 0) {
+			POSITION pos = FindPos(lpnmlv->iItem);
+			// If the file is already playing, don't try to restore a previously saved position
+			if (m_pMainFrame->GetPlaybackMode() == PM_FILE && pos == curPlayList.GetPos()) {
+				const CPlaylistItem& pli = curPlayList.GetAt(pos);
+				AfxGetAppSettings().RemoveFile(pli.m_fns.front());
+			}
+			else {
+				curPlayList.SetPos(pos);
+			}
 
-	if (lpnmlv->iItem >= 0 && lpnmlv->iSubItem >= 0) {
-		POSITION pos = FindPos(lpnmlv->iItem);
-		// If the file is already playing, don't try to restore a previously saved position
-		if (m_pMainFrame->GetPlaybackMode() == PM_FILE && pos == m_pl.GetPos()) {
-			const CPlaylistItem& pli = m_pl.GetAt(pos);
-			AfxGetAppSettings().RemoveFile(pli.m_fns.front());
-		} else {
-			m_pl.SetPos(pos);
+			m_list.Invalidate();
+			m_pMainFrame->OpenCurPlaylistItem();
 		}
-
-		m_list.Invalidate();
-		m_pMainFrame->OpenCurPlaylistItem();
+		AfxGetMainWnd()->SetFocus();
 	}
+	else if (TGetPlaylistType() == EXPLORER) {
+		if (TNavigate()) {
+			;
+		}
+		else if (lpnmlv->iItem >= 0 && lpnmlv->iSubItem >= 0) {
+			POSITION pos = FindPos(lpnmlv->iItem);
+			// If the file is already playing, don't try to restore a previously saved position
+			if (m_pMainFrame->GetPlaybackMode() == PM_FILE && pos == curPlayList.GetPos()) {
+				const CPlaylistItem& pli = curPlayList.GetAt(pos);
+				AfxGetAppSettings().RemoveFile(pli.m_fns.front());
+			}
+			else {
+				curPlayList.SetPos(pos);
+			}
 
-	AfxGetMainWnd()->SetFocus();
-
+			m_list.Invalidate();
+			m_pMainFrame->OpenCurPlaylistItem();
+			AfxGetMainWnd()->SetFocus();
+		}
+	}
+	
 	*pResult = 0;
+}
+
+void CPlayerPlaylistBar::OnMouseLeave()
+{
+	bt_idx = -1;
+	TDrawBar();
+}
+
+void CPlayerPlaylistBar::OnPaint()
+{
+	CPaintDC dc(this);
+	TDrawBar();
+
 }
 
 void CPlayerPlaylistBar::OnCustomdrawList(NMHDR* pNMHDR, LRESULT* pResult)
@@ -2204,8 +2320,8 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 	}
 
 	const CAppSettings& s = AfxGetAppSettings();
-	const auto bSelected = pos == m_pl.GetPos();
-	const CPlaylistItem& pli = m_pl.GetAt(pos);
+	const auto bSelected = pos == curPlayList.GetPos();
+	const CPlaylistItem& pli = curPlayList.GetAt(pos);
 
 	CDC* pDC = CDC::FromHandle(lpDrawItemStruct->hDC);
 
@@ -2263,19 +2379,62 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 			pDC->TextOut(timept.x, timept.y, time);
 		}
 	}
-
+	
 	CString fmt, file;
-	fmt.Format(L"%%0%dd. %%s", (int)log10(0.1 + m_pl.GetCount()) + 1);
+
+	fmt.Format(L"%%0%dd. %%s", (int)log10(0.1 + curPlayList.GetCount()) + 1);
 	file.Format(fmt, nItem + 1, m_list.GetItemText(nItem, COL_NAME));
 	CSize filesize = pDC->GetTextExtent(file);
+	
+	int offset = 0;
+	if (TGetPlaylistType() == EXPLORER) {
+		file = m_list.GetItemText(nItem, COL_NAME);
+		int w = rcItem.Height() - 4;
+		SHFILEINFO shFileInfo;
+		UINT flag = SHGFI_ICON | SHGFI_USEFILEATTRIBUTES;
+		flag |= w > 24 ? SHGFI_LARGEICON : SHGFI_SMALLICON;
+
+		//CString strFSObject = m_list.GetItemText(nItem, COL_NAME);
+		bool bfsFolder = false;
+		if (file.Right(1) == L"<") {
+			file = L"[..]";
+			bfsFolder = true;
+		}
+		else if (file.Right(1) == L">"){
+			file.TrimRight(L">");
+			file = L"[" + file + L"]";
+			bfsFolder = true;
+		}
+		// to do special icon(UP ARROW) for [..]
+		if (bfsFolder) { // draw FolderIcon
+			SHGetFileInfo(L"111", FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFO), flag);
+			HICON hicon = (HICON)shFileInfo.hIcon;
+			DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hicon, w, w, 0, nullptr, DI_NORMAL);
+			DestroyIcon(hicon);
+		}
+		else { // draw FileIcon
+			CString path;
+			path.Preallocate(MAX_PATH);
+			POSITION pos = FindPos(nItem);
+			const CPlaylistItem& pli = curPlayList.GetAt(pos);
+			for (const auto& fi : pli.m_fns) {
+				path = fi.GetName();
+			}
+			SHGetFileInfo(path, 0, &shFileInfo, sizeof(SHFILEINFO), flag);
+			HICON hicon = (HICON)shFileInfo.hIcon;
+			DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hicon, w, w, 0, nullptr, DI_NORMAL);
+			DestroyIcon(hicon);
+		}
+
+		offset = rcItem.Height();
+	}
 	while (3 + filesize.cx + 6 > timept.x && file.GetLength() > 3) {
 		file = file.Left(file.GetLength() - 4) + L"...";
 		filesize = pDC->GetTextExtent(file);
 	}
-
-	if (file.GetLength() > 3) {
+	if (file.GetLength() > 3 || TGetPlaylistType() == EXPLORER) { // L"C:".GetLenght() < 3 
 		pDC->SetTextColor(textcolor);
-		pDC->TextOut(rcItem.left + 3, (rcItem.top + rcItem.bottom - filesize.cy) / 2, file);
+		pDC->TextOut(rcItem.left + 3 + offset, (rcItem.top + rcItem.bottom - filesize.cy) / 2, file);
 	}
 }
 
@@ -2337,6 +2496,14 @@ void CPlayerPlaylistBar::OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CPlayerPlaylistBar::OnMouseMove(UINT nFlags, CPoint point)
 {
+	TRACKMOUSEEVENT tme;
+	tme.cbSize = sizeof(tme);
+	tme.hwndTrack = GetSafeHwnd();
+	tme.dwFlags = TME_LEAVE;
+	TrackMouseEvent(&tme);
+
+	TDrawBar();
+
 	if (m_bDragging) {
 		m_ptDropPoint = point;
 		ClientToScreen(&m_ptDropPoint);
@@ -2398,30 +2565,80 @@ void CPlayerPlaylistBar::OnTimer(UINT_PTR nIDEvent)
 	__super::OnTimer(nIDEvent);
 }
 
-void CPlayerPlaylistBar::OnLButtonUp(UINT nFlags, CPoint point)
+void CPlayerPlaylistBar::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
-	if (m_bDragging) {
-		::ReleaseCapture();
 
-		m_bDragging = FALSE;
-		m_pDragImage->DragLeave(GetDesktopWindow());
-		m_pDragImage->EndDrag();
+	CRect rcBar;
+	GetClientRect(&rcBar);
 
-		delete m_pDragImage;
-		m_pDragImage = nullptr;
+	if (!rcBar.PtInRect(point)) {
+		__super::OnLButtonDblClk(nFlags, point);
 
-		KillTimer(1);
-		KillTimer(2);
+	}
+}
 
-		CPoint pt(point);
-		ClientToScreen(&pt);
 
-		if (WindowFromPoint(pt) == &m_list) {
-			DropItemOnList();
-		}
+void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	
+	CRect rcBar;
+	GetClientRect(&rcBar);
+
+	if (!rcBar.PtInRect(point)) {
+		__super::OnLButtonDown(nFlags, point);
 	}
 
-	ModifyStyle(0, WS_EX_ACCEPTFILES);
+	if (tabs[tabs.size()-3].r.PtInRect(point)) {
+		TOnMenu();
+		return;
+	}
+	else if (tabs[tabs.size() - 2].r.PtInRect(point)) {
+		TSetOffset();
+		TCalcLayout();
+		TDrawBar();
+	}
+	else if (tabs[tabs.size() - 1].r.PtInRect(point)) {
+		TSetOffset(true);
+		TCalcLayout();
+		TDrawBar();
+	}
+	else {
+		for (size_t i = 0; i < tabs.size() - 3; i++) {
+
+			if (tabs[i].r.PtInRect(point)) {
+				//SavePlaylist();
+				m_nCurPlayListIndex = i;
+				TSelectTab();
+				return;
+			}
+		}
+	}
+}
+
+void CPlayerPlaylistBar::OnLButtonUp(UINT nFlags, CPoint point)
+{
+		if (m_bDragging) {
+			::ReleaseCapture();
+
+			m_bDragging = FALSE;
+			m_pDragImage->DragLeave(GetDesktopWindow());
+			m_pDragImage->EndDrag();
+
+			delete m_pDragImage;
+			m_pDragImage = nullptr;
+
+			KillTimer(1);
+			KillTimer(2);
+
+			CPoint pt(point);
+			ClientToScreen(&pt);
+
+			if (WindowFromPoint(pt) == &m_list) {
+				DropItemOnList();
+			}
+		}
+
+		ModifyStyle(0, WS_EX_ACCEPTFILES);
 
 	__super::OnLButtonUp(nFlags, point);
 }
@@ -2484,21 +2701,21 @@ void CPlayerPlaylistBar::DropItemOnList()
 	UINT id = (UINT)-1;
 	for (int i = 0; i < m_list.GetItemCount(); i++) {
 		POSITION pos = (POSITION)m_list.GetItemData(i);
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		tmp.push_back(pli);
-		if (pos == m_pl.GetPos()) {
+		if (pos == curPlayList.GetPos()) {
 			id = pli.m_id;
 		}
 	}
-	m_pl.RemoveAll();
+	curPlayList.RemoveAll();
 	auto it = tmp.begin();
 	for (int i = 0; it != tmp.end(); i++) {
 		CPlaylistItem& pli = *it++;
-		m_pl.AddTail(pli);
+		curPlayList.AddTail(pli);
 		if (pli.m_id == id) {
-			m_pl.SetPos(m_pl.GetTailPosition());
+			curPlayList.SetPos(curPlayList.GetTailPosition());
 		}
-		m_list.SetItemData(i, (DWORD_PTR)m_pl.GetTailPosition());
+		m_list.SetItemData(i, (DWORD_PTR)curPlayList.GetTailPosition());
 	}
 
 	ResizeListColumn();
@@ -2515,11 +2732,11 @@ BOOL CPlayerPlaylistBar::OnToolTipNotify(UINT id, NMHDR* pNMHDR, LRESULT* pResul
 	int row = ((pNMHDR->idFrom-1) >> 10) & 0x3fffff;
 	int col = (pNMHDR->idFrom-1) & 0x3ff;
 
-	if (row < 0 || row >= m_pl.GetCount()) {
+	if (row < 0 || row >= curPlayList.GetCount()) {
 		return FALSE;
 	}
 
-	CPlaylistItem& pli = m_pl.GetAt(FindPos(row));
+	CPlaylistItem& pli = curPlayList.GetAt(FindPos(row));
 
 	static CString strTipText; // static string
 	strTipText.Empty();
@@ -2577,7 +2794,7 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 	bool bMIEnable = false;
 	CString sCurrentPath;
 	if (pos) {
-		CPlaylistItem& pli = m_pl.GetAt(pos);
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		if (!pli.m_fns.empty()) {
 			sCurrentPath = pli.m_fns.cbegin()->GetName();
 			bMIEnable = !::PathIsURLW(sCurrentPath) && sCurrentPath != L"pipe://stdin";
@@ -2608,25 +2825,26 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 
 	CAppSettings& s = AfxGetAppSettings();
 
+	bool bExplorer = TGetPlaylistType() == EXPLORER;
 	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_OPEN, ResStr(IDS_PLAYLIST_OPEN) + L"\tSpace");
-	m.AppendMenu(MF_STRING | MF_ENABLED, M_ADD, ResStr(IDS_PLAYLIST_ADD));
-	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_REMOVE, ResStr(IDS_PLAYLIST_REMOVE) + L"\tDelete");
+	m.AppendMenu(MF_STRING | (!bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_ADD, ResStr(IDS_PLAYLIST_ADD));
+	m.AppendMenu(MF_STRING | (bOnItem && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_REMOVE, ResStr(IDS_PLAYLIST_REMOVE) + L"\tDelete");
 	m.AppendMenu(MF_SEPARATOR);
-	m.AppendMenu(MF_STRING | (bOnItem  ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_DELETE, ResStr(IDS_PLAYLIST_DELETE) + L"\tShift+Delete");
+	m.AppendMenu(MF_STRING | (bOnItem && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_DELETE, ResStr(IDS_PLAYLIST_DELETE) + L"\tShift+Delete");
 	m.AppendMenu(MF_SEPARATOR);
-	m.AppendMenu(MF_STRING | (m_pl.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLEAR, ResStr(IDS_PLAYLIST_CLEAR));
+	m.AppendMenu(MF_STRING | (curPlayList.GetCount() && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLEAR, ResStr(IDS_PLAYLIST_CLEAR));
 	m.AppendMenu(MF_SEPARATOR);
 	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLIPBOARD, ResStr(IDS_PLAYLIST_COPYTOCLIPBOARD));
-	m.AppendMenu(MF_STRING | (m_pl.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SAVEAS, ResStr(IDS_PLAYLIST_SAVEAS));
+	m.AppendMenu(MF_STRING | (curPlayList.GetCount() && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SAVEAS, ResStr(IDS_PLAYLIST_SAVEAS));
 	m.AppendMenu(MF_SEPARATOR);
 	CMenu submenu2;
 	submenu2.CreatePopupMenu();
 	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYNAME, ResStr(IDS_PLAYLIST_SORTBYLABEL));
 	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYPATH, ResStr(IDS_PLAYLIST_SORTBYPATH));
 	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTREVERSE, ResStr(IDS_PLAYLIST_SORTREVERSE));
-	m.AppendMenu(MF_STRING | MF_POPUP | (m_pl.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), (UINT_PTR)submenu2.Detach(), ResStr(IDS_PLAYLIST_SORT));
-	m.AppendMenu(MF_STRING | (m_pl.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_RANDOMIZE, ResStr(IDS_PLAYLIST_RANDOMIZE));
-	m.AppendMenu(MF_STRING | (m_pl.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SORTBYID, ResStr(IDS_PLAYLIST_RESTORE));
+	m.AppendMenu(MF_STRING | MF_POPUP | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), (UINT_PTR)submenu2.Detach(), ResStr(IDS_PLAYLIST_SORT));
+	m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_RANDOMIZE, ResStr(IDS_PLAYLIST_RANDOMIZE));
+	m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SORTBYID, ResStr(IDS_PLAYLIST_RESTORE));
 	m.AppendMenu(MF_SEPARATOR);
 	m.AppendMenu(MF_STRING | MF_ENABLED | (s.bShufflePlaylistItems ? MF_CHECKED : MF_UNCHECKED), M_SHUFFLE, ResStr(IDS_PLAYLIST_SHUFFLE));
 	m.AppendMenu(MF_SEPARATOR);
@@ -2646,15 +2864,17 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 	int nID = (int)m.TrackPopupMenu(TPM_LEFTBUTTON | TPM_RETURNCMD, p.x, p.y, this);
 	switch (nID) {
 		case M_OPEN:
-			m_pl.SetPos(pos);
+			if (TNavigate()) return;
+			curPlayList.SetPos(pos);
 			m_list.Invalidate();
 			m_pMainFrame->OpenCurPlaylistItem();
 			break;
 		case M_ADD:
 			{
+			if (bExplorer) return;
 				if (m_pMainFrame->GetPlaybackMode() == PM_CAPTURE) {
 					m_pMainFrame->AddCurDevToPlaylist();
-					m_pl.SetPos(m_pl.GetTailPosition());
+					curPlayList.SetPos(curPlayList.GetTailPosition());
 				} else {
 					CString filter;
 					std::vector<CString> mask;
@@ -2684,6 +2904,7 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 		case M_REMOVE:
 		case M_DELETE:
 			{
+			if (bExplorer) return;
 				std::vector<int> items;
 				items.reserve(m_list.GetSelectedCount());
 				POSITION pos = m_list.GetFirstSelectedItemPosition();
@@ -2695,33 +2916,34 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 			}
 			break;
 		case M_CLEAR:
+			if (bExplorer) return;
 			if (Empty()) {
 				m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
 			}
 			break;
 		case M_SORTBYID:
-			m_pl.SortById();
+			curPlayList.SortById();
 			SetupList();
 			SavePlaylist();
-			EnsureVisible(m_pl.GetPos(), true);
+			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTBYNAME:
-			m_pl.SortByName();
+			curPlayList.SortByName();
 			SetupList();
 			SavePlaylist();
-			EnsureVisible(m_pl.GetPos(), true);
+			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTBYPATH:
-			m_pl.SortByPath();
+			curPlayList.SortByPath();
 			SetupList();
 			SavePlaylist();
-			EnsureVisible(m_pl.GetPos(), true);
+			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTREVERSE:
-			m_pl.ReverseSort();
+			curPlayList.ReverseSort();
 			SetupList();
 			SavePlaylist();
-			EnsureVisible(m_pl.GetPos(), true);
+			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_RANDOMIZE:
 			Randomize();
@@ -2738,7 +2960,7 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 				}
 
 				for (const auto& item : items) {
-					CPlaylistItem &pli = m_pl.GetAt(FindPos(item));
+					CPlaylistItem &pli = curPlayList.GetAt(FindPos(item));
 					for (const auto& fi : pli.m_fns) {
 						str += L"\r\n" + fi.GetName();
 					}
@@ -2800,9 +3022,9 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 			p.RemoveFileSpec();
 			CString base = (LPCTSTR)p;
 
-			pos = m_pl.GetHeadPosition();
+			pos = curPlayList.GetHeadPosition();
 			while (pos && fRemovePath) {
-				CPlaylistItem& pli = m_pl.GetNext(pos);
+				CPlaylistItem& pli = curPlayList.GetNext(pos);
 
 				if (pli.m_type != CPlaylistItem::file) {
 					fRemovePath = false;
@@ -2849,11 +3071,11 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 				f.WriteString(L"<ASX version = \"3.0\">\n");
 			}
 
-			pos = m_pl.GetHeadPosition();
+			pos = curPlayList.GetHeadPosition();
 			CString str;
 			int i;
 			for (i = 0; pos; i++) {
-				CPlaylistItem& pli = m_pl.GetNext(pos);
+				CPlaylistItem& pli = curPlayList.GetNext(pos);
 
 				if (pli.m_type != CPlaylistItem::file) {
 					continue;
@@ -2927,7 +3149,7 @@ void CPlayerPlaylistBar::OnLvnEndlabeleditList(NMHDR* pNMHDR, LRESULT* pResult)
 	NMLVDISPINFO* pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
 
 	if (pDispInfo->item.iItem >= 0 && pDispInfo->item.pszText) {
-		CPlaylistItem& pli = m_pl.GetAt((POSITION)m_list.GetItemData(pDispInfo->item.iItem));
+		CPlaylistItem& pli = curPlayList.GetAt((POSITION)m_list.GetItemData(pDispInfo->item.iItem));
 		pli.m_label = pDispInfo->item.pszText;
 		m_list.SetItemText(pDispInfo->item.iItem, 0, pDispInfo->item.pszText);
 	}
@@ -2953,3 +3175,917 @@ void CPlayerPlaylistBar::OnSetFocus(CWnd* pOldWnd)
 		m_list.SetFocus();
 	}
 }
+void CPlayerPlaylistBar::TCalcLayout()
+{
+
+	CClientDC dc(this);
+	CDC mdc;
+	mdc.CreateCompatibleDC(&dc);
+
+	NONCLIENTMETRICS ncm = { sizeof(NONCLIENTMETRICS) };
+	VERIFY(SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0));
+
+	auto& lf = ncm.lfMessageFont;
+	iTFontSize = lf.lfHeight = m_pMainFrame->ScaleSystemToMonitorY(lf.lfHeight)
+		* AfxGetAppSettings().iPlsFontPercent / 100
+		* (m_pMainFrame->GetDPIScalePercent() / 100);
+
+	CFont font;
+	font.CreateFontIndirect(&lf);
+
+	mdc.SelectObject(&font);
+
+	CRect rcTabBar;
+	GetClientRect(&rcTabBar);
+	rcTabBar.bottom = (rcTabBar.top + abs(iTFontSize) * 2);
+	rcTabBar.DeflateRect(2, 1, 2, 1);
+	int wTsSize = 0;
+
+	int wSysButton = WIDTH_TABBUTTON * (m_pMainFrame->GetDPIScalePercent() / 100);
+
+	rcTPage = rcTabBar;
+	rcTPage.right = rcTabBar.right - wSysButton;
+
+	tabs[tabs.size() - 2].bVisible = false;
+	tabs[tabs.size() - 1].bVisible = false;
+
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		wTsSize += mdc.GetTextExtent(tabs[i].name).cx + WIDTH_TABBUTTON;
+
+	}
+	tabs[tabs.size() - 3].r = rcTabBar;
+	tabs[tabs.size() - 3].r.left = rcTabBar.right - wSysButton;
+	tabs[tabs.size() - 3].r.right = tabs[tabs.size() - 3].r.left + wSysButton;
+
+
+	if (wTsSize > rcTabBar.right - wSysButton || cntOffset > 0) {
+		rcTPage.left = rcTabBar.left + wSysButton;
+		rcTPage.right = rcTabBar.right - wSysButton * 2 - 3;
+		tabs[tabs.size() - 1].r = rcTabBar;
+		tabs[tabs.size() - 2].r = rcTabBar;
+		tabs[tabs.size() - 1].bVisible = true;
+		tabs[tabs.size() - 2].bVisible = true;
+		tabs[tabs.size() - 2].r.left = rcTabBar.right - wSysButton * 2;
+		tabs[tabs.size() - 2].r.right = tabs[tabs.size() - 2].r.left + wSysButton;
+		tabs[tabs.size() - 1].r.left = rcTabBar.left;
+		tabs[tabs.size() - 1].r.right = tabs[tabs.size() - 1].r.left + wSysButton;
+
+	}
+	else if (wTsSize <= rcTabBar.right - wSysButton) {
+		rcTPage.left = rcTabBar.left;
+	}
+
+
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		tabs[i].r = rcTabBar;
+		int wTab = mdc.GetTextExtent(tabs[i].name).cx + WIDTH_TABBUTTON;
+		if (i == 0) {
+			tabs[i].r.left = rcTPage.left - TGetOffset();
+			tabs[i].r.right = tabs[i].r.left + wTab;
+		}
+		else {
+			tabs[i].r.left = tabs[i - 1].r.right;
+			tabs[i].r.right = tabs[i].r.left + wTab;
+		}
+	}
+
+	mdc.DeleteDC();
+}
+
+void CPlayerPlaylistBar::TIndexHighighted()
+{
+	CPoint p;
+	GetCursorPos(&p);
+	ScreenToClient(&p);
+
+	bt_idx = -1;
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		if (tabs[i].r.PtInRect(p) && tabs[i].bVisible && rcTPage.PtInRect(p)) {
+			bt_idx = i;
+			return;
+		}
+	}
+	for (size_t i = tabs.size() - 3; i < tabs.size(); i++) {
+		if (tabs[i].r.PtInRect(p) && tabs[i].bVisible) {
+			bt_idx = i;
+			return;
+		}
+	}
+}
+
+void CPlayerPlaylistBar::TDrawBar()
+{
+	CClientDC dc(this);
+	if (IsWindowVisible()) {
+
+		TIndexHighighted();
+
+		CDC mdc;
+		mdc.CreateCompatibleDC(&dc);
+
+		NONCLIENTMETRICS ncm = { sizeof(NONCLIENTMETRICS) };
+		VERIFY(SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0));
+		auto& lf = ncm.lfMessageFont;
+		iTFontSize = lf.lfHeight = m_pMainFrame->ScaleSystemToMonitorY(lf.lfHeight) * AfxGetAppSettings().iPlsFontPercent / 100 * (m_pMainFrame->GetDPIScalePercent() / 100);
+		CFont font;
+		font.CreateFontIndirect(&lf);
+		mdc.SelectObject(&font);
+
+		CRect rcTabBar;
+		GetClientRect(&rcTabBar);
+		rcTabBar.bottom = (rcTabBar.top + abs(iTFontSize) * 2);
+
+		CBitmap bm;
+		bm.CreateCompatibleBitmap(&dc, rcTabBar.Width(), rcTabBar.Height());
+		CBitmap* pOldBm = mdc.SelectObject(&bm);
+		mdc.SetBkMode(TRANSPARENT);
+
+		// background Tab bar
+		mdc.FillSolidRect(rcTabBar, m_crBkBar);
+
+		for (size_t i = tabs.size() - 3; i < tabs.size(); i++) {
+
+			if (tabs[i].bVisible) {
+
+				// Buttons
+				mdc.Draw3dRect(tabs[i].r, m_crBNL, m_crBND);
+				mdc.SetTextColor(m_crTN);
+				mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &tabs[i].r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+				// Highlighted Buttons
+				if (i == bt_idx && bt_idx != m_nCurPlayListIndex) {
+					mdc.SetTextColor(m_crTH);
+					mdc.FillSolidRect(tabs[i].r, m_crBH);
+					mdc.Draw3dRect(tabs[i].r, m_crBHL, m_crBHD);
+					mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &tabs[i].r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				}
+			}
+		}
+		//HRGN hrgn;
+		//GetClipRgn(mdc, hrgn);
+
+		HRGN hRgnExclude = ::CreateRectRgnIndirect(&rcTPage);
+		SelectClipRgn(mdc, hRgnExclude);
+		for (size_t i = 0; i < tabs.size() - 3; i++) {
+			CRect rcText = tabs[i].r;
+			rcText.DeflateRect(2, 2, 2, 2);
+			// tab
+			if (tabs[i].bVisible) {
+				mdc.SetTextColor(m_crTN);
+				mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				// higjlighted tab
+				if (i == bt_idx && bt_idx != m_nCurPlayListIndex) {
+					mdc.SetTextColor(m_crTH);
+					mdc.FillSolidRect(tabs[i].r, m_crBH);
+					mdc.Draw3dRect(tabs[i].r, m_crBHL, m_crBHL);
+					mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				}
+				// current activetab
+				if (i == m_nCurPlayListIndex) {
+					if (i == bt_idx) { // selected and highlighted
+						mdc.SetTextColor(m_crTS);
+						mdc.FillSolidRect(tabs[i].r, m_crBSH);
+						mdc.Draw3dRect(tabs[i].r, m_crBSHL, m_crBSHL);
+						mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+					}
+					else { // selected
+						mdc.FillSolidRect(tabs[i].r, m_crBS);
+						mdc.SetTextColor(m_crTS);
+						mdc.Draw3dRect(tabs[i].r, m_crBSL, m_crBSL);
+						mdc.DrawText(tabs[i].name, tabs[i].name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+					}
+
+				}
+			}
+		}
+		//SelectClipRgn(mdc, hrgn);
+
+		dc.BitBlt(0, 0, rcTabBar.Width(), rcTabBar.Height(), &mdc, 0, 0, SRCCOPY);
+
+		mdc.SelectObject(pOldBm);
+		bm.DeleteObject();
+		mdc.DeleteDC();
+	}
+}
+
+void CPlayerPlaylistBar::TOnMenu()
+{
+	bt_idx = -1;
+
+	CPoint p;
+	p.x = tabs[tabs.size() - 3].r.left;
+	p.y = tabs[tabs.size() - 3].r.bottom;
+	ClientToScreen(&p);
+
+	CMenu menu;
+	menu.CreatePopupMenu();
+
+	CAppSettings& s = AfxGetAppSettings();
+
+	UINT id = 1;
+	CMenu submenu;
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		UINT flags = MF_BYPOSITION | MF_STRING | MF_ENABLED;
+		if (i == m_nCurPlayListIndex) {
+			flags |= MF_CHECKED | MFT_RADIOCHECK;
+		}
+		menu.AppendMenu(flags, id++, tabs[i].name);
+	}
+	menu.AppendMenu(MF_SEPARATOR);
+
+	submenu.CreatePopupMenu();
+	submenu.AppendMenu(MF_BYPOSITION | MF_STRING | MF_ENABLED, id++, L"Add Playlist type");
+	submenu.AppendMenu(MF_BYPOSITION | MF_STRING | MF_ENABLED, id++, L"Add Explorer type");
+	menu.AppendMenu(MF_BYPOSITION | MF_STRING | MF_POPUP | MF_ENABLED, (UINT_PTR)submenu.Detach(), L"ADD PLAYLIST");
+	menu.AppendMenu(MF_BYPOSITION | MF_STRING | ((m_nCurPlayListIndex > 0 && tabs[m_nCurPlayListIndex].type != BUTTON) ? MF_ENABLED : (MF_DISABLED | MF_GRAYED))
+		, id++, L"RENAME SELECTED PLAYLIST");
+	menu.AppendMenu(MF_BYPOSITION | MF_STRING | ((m_nCurPlayListIndex > 0 && tabs[m_nCurPlayListIndex].type != BUTTON) ? MF_ENABLED : (MF_DISABLED | MF_GRAYED))
+		, id++, L"DELETE SELECTED PLAYLIST");
+	
+	
+	if (s.bUseDarkTheme && s.bDarkMenu) {
+		MENUINFO MenuInfo = { 0 };
+		MenuInfo.cbSize = sizeof(MenuInfo);
+		MenuInfo.hbrBack = m_pMainFrame->m_hPopupMenuBrush;
+		MenuInfo.fMask = MIM_BACKGROUND | MIM_APPLYTOSUBMENUS;
+		SetMenuInfo(menu.GetSafeHmenu(), &MenuInfo);
+
+		CMenuEx::ChangeStyle(&menu);
+	}
+
+	CString strDefName = L"";
+	CString strGetName = L"";
+	
+	int nID = (int)menu.TrackPopupMenu(TPM_LEFTBUTTON | TPM_RETURNCMD, p.x, p.y, this);
+	int size = tabs.size() - 3;
+
+	if (nID > 0 && nID <= size) {
+		m_nCurPlayListIndex = nID - 1;
+		TEnsureVisible(m_nCurPlayListIndex);
+		TSelectTab();
+	} else {
+		int element = (nID - size);
+
+		switch (element) {
+		case 0:
+			return;
+		case 1: // ADD PLAYLIST TAB
+		{
+			size_t cnt = 1;
+			for (size_t i = 0; i < tabs.size() - 3; i++) {
+				if (tabs[i].type == PLAYLIST && i > 0) {
+					cnt++;
+				}
+			}
+
+			strDefName.Format(L"Playlist %d", cnt); // default value for CEdit dlg
+			CPlaylistNameDlg dlg(strDefName);
+			if (dlg.DoModal() != IDOK) {
+				return;
+			}
+			strGetName = dlg.m_name;
+			if (strGetName.IsEmpty()) 
+				return;
+
+			tab tpl;
+			tpl.type = PLAYLIST;
+			tpl.name = strGetName;
+			tpl.fn.Format(L"%s.mpcpl", strGetName);
+			tpl.r.SetRect(0, 0, 0, 0);
+
+			tabs.insert(tabs.begin() + m_nCurPlayListIndex + 1, tpl);
+
+			CPlaylist* pl = DNew CPlaylist;
+			m_pls.insert(m_pls.begin() + m_nCurPlayListIndex + 1, pl);
+
+			SavePlaylist(); // save current playlist
+			m_nCurPlayListIndex++;
+			SavePlaylist(); //save new playlist
+
+			TSelectTab();
+		}
+			break;
+		case 2: // ADD EXPLORER TAB
+		{
+			size_t cnt = 1;
+			for (size_t i = 0; i < tabs.size() - 3; i++) {
+				if (tabs[i].type == EXPLORER) {
+					cnt++;
+				}
+			}
+			strDefName.Format(L"Explorer %d", cnt);// default value for CEdit dlg
+			CPlaylistNameDlg dlg(strDefName);
+			if (dlg.DoModal() != IDOK) {
+				return;
+			}
+			strGetName = dlg.m_name;
+			if (strGetName.IsEmpty()) return;
+			tab t;
+			t.type = EXPLORER;
+			t.name = strGetName;
+			t.fn.Format(L"%s.mpcpl", strGetName);
+			t.r.SetRect(0, 0, 0, 0);
+
+			tabs.insert(tabs.begin() + m_nCurPlayListIndex + 1, t);
+
+			CPlaylist* pl = DNew CPlaylist;
+			m_pls.insert(m_pls.begin() + m_nCurPlayListIndex + 1, pl);
+
+			SavePlaylist(); //save current playlist
+			m_nCurPlayListIndex++;
+			SavePlaylist(); //save new playlist
+
+			TSelectTab();
+			TParseFolder(L".\\");
+			break;
+		}
+		case 3: // RENAME TAB
+		{
+			strDefName = tabs[m_nCurPlayListIndex].name;
+			CPlaylistNameDlg dlg(strDefName);
+			if (dlg.DoModal() != IDOK) {
+				return;
+			}
+			strGetName = dlg.m_name;
+			if (strGetName.IsEmpty()) return;
+			CString oldfn = tabs[m_nCurPlayListIndex].fn;
+			tabs[m_nCurPlayListIndex].name = strGetName;
+			tabs[m_nCurPlayListIndex].fn.Format(L"%s.mpcpl", strGetName);
+
+			CString base;
+			CString newfn;
+			if (AfxGetMyApp()->GetAppSavePath(base)) {
+				newfn = base + tabs[m_nCurPlayListIndex].fn;
+				oldfn = base + oldfn;
+
+				if (::PathFileExistsW(base)) {
+					::MoveFileW(oldfn, newfn);
+				}
+			}
+		}
+			break;
+		case 4: // DELETE TAB
+		{
+			TDeletePlaylist();
+		}
+			break;
+		default:
+			return;
+			break;
+
+		}
+	}
+
+	Refresh();
+	TCalcLayout();
+	TDrawBar();
+}
+
+void CPlayerPlaylistBar::TDeletePlaylist()
+{
+	if (Empty()) {
+		m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
+	}
+	
+	CString base;
+	if (AfxGetMyApp()->GetAppSavePath(base)) {
+		base.Append(tabs[m_nCurPlayListIndex].fn);
+
+		if (::PathFileExistsW(base)) {
+			::DeleteFileW(base);
+		}
+	}
+
+	tabs.erase(tabs.begin() + m_nCurPlayListIndex);
+	m_pls.erase(m_pls.begin() + m_nCurPlayListIndex);
+
+	tabs.size()-3 > m_nCurPlayListIndex ? m_nCurPlayListIndex : m_nCurPlayListIndex--;
+
+	TSelectTab();
+}
+
+void CPlayerPlaylistBar::TDeleteAllPlaylists()
+{
+	m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
+	
+	m_nCurPlayListIndex = 0; // otherwise, the selected
+	SavePlaylist(); //  tab will not be removed
+
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		CString base;
+		if (AfxGetMyApp()->GetAppSavePath(base)) {
+			base.Append(tabs[i].fn);
+
+			if (::PathFileExistsW(base)) {
+				::DeleteFileW(base);
+			}
+		}
+	}
+}
+
+void CPlayerPlaylistBar::TSelectTab()
+{
+
+	TSaveSettings();
+	Refresh();
+	if (curPlayList.m_nSelected_idx != INT_MAX) {
+		SetSelIdx(curPlayList.m_nSelected_idx + 1, true);
+		curPlayList.m_nSelected_idx = INT_MAX;
+	}
+	else {
+		CString base;
+		if (AfxGetMyApp()->GetAppSavePath(base)) {
+			base.Append(tabs[m_nCurPlayListIndex].fn);
+
+			if (::PathFileExistsW(base)) {
+				SelectFileInPlaylist(base);
+			}
+		}
+	}
+	TCalcLayout();
+	TDrawBar();
+}
+
+void CPlayerPlaylistBar::TParseFolder(CString path)
+{
+
+	CAppSettings& s = AfxGetAppSettings();
+	CMediaFormats& mf = s.m_Formats;
+
+	WIN32_FIND_DATA FindFileData;
+	HANDLE hFind;
+
+	if (path == L".\\") { // root
+
+		int nPos = 0;
+		UINT nCount = 0;
+		CString strDrive = "?:\\";
+
+		DWORD dwDriveList = ::GetLogicalDrives();
+
+		while (dwDriveList) {
+			if (dwDriveList & 1) {
+				strDrive.SetAt(0, 0x41 + nPos);
+				strDrive = strDrive.Left(2);
+				CPlaylistItem pli;
+				pli.m_fns.push_front(strDrive);
+				curPlayList.AddTail(pli);
+			}
+			dwDriveList >>= 1;
+			nPos++;
+		}
+		return;
+	}
+
+	const CString Path = path;
+	const CString mask = Path + L"*.*";
+
+	hFind = FindFirstFile(mask, &FindFileData);
+
+	CPlaylistItem pli;
+	pli.m_fns.push_front(Path + L"<"); // Parent folder mark;
+	curPlayList.AddTail(pli);
+
+	//CFileStatus status;
+	//if (CFile::GetStatus(fileName, status) && status.m_attribute == 0x10) {
+		//it's directory
+	//}
+
+	if (hFind != INVALID_HANDLE_VALUE) {
+
+		do {
+			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY
+				&& FindFileData.cFileName != CString(".")
+				&& FindFileData.cFileName != CString("..")
+				&& FindFileData.cFileName != CString("System Volume Information")
+				&& FindFileData.cFileName != CString("$RECYCLE.BIN")
+				&& FindFileData.cFileName != CString("$Recycle.Bin"))
+			{
+				CString path2 = Path + FindFileData.cFileName + L">"; // Folders mark
+
+				CPlaylistItem pli;
+				pli.m_fns.push_front(path2);
+				curPlayList.AddTail(pli);
+			}
+		} while ((::WaitForSingleObject(m_hStopEvent, 0) !=
+			WAIT_OBJECT_0) && (::FindNextFile(hFind, &FindFileData)));
+		::FindClose(hFind);;
+
+		hFind = FindFirstFile(mask, &FindFileData);
+		
+		do {
+
+			if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+				const CString ext = GetFileExt(FindFileData.cFileName).MakeLower();
+				if (mf.FindExt(ext)) {
+
+					CPlaylistItem pli;
+					pli.m_fns.push_front(Path + FindFileData.cFileName); // Files
+					curPlayList.AddTail(pli);
+				}
+			}
+		} while ((::WaitForSingleObject(m_hStopEvent, 0) !=
+			WAIT_OBJECT_0) && (::FindNextFile(hFind, &FindFileData)));
+		::FindClose(hFind);;
+	}
+}
+
+int CPlayerPlaylistBar::TGetPlaylistType()
+{
+	int Ret = 0;
+	if (tabs[m_nCurPlayListIndex].type == PLAYLIST) {
+		Ret = 0;
+	}
+	else if (tabs[m_nCurPlayListIndex].type == EXPLORER) {
+		Ret = 1;
+	}
+	else {
+		Ret = 2; // == BUTTONS
+	}
+	return Ret;
+}
+
+void CPlayerPlaylistBar::TTokenizer(const CString& strFields, const CString& strDelimiters, CStringArray& arFields)
+{
+	arFields.RemoveAll();
+
+	// Do not process empty strings.
+	if (!strFields.IsEmpty() && !strDelimiters.IsEmpty())
+	{
+		int nPosition = 0, nTotalFields = 0, nStr = 0;
+
+		do
+		{
+			int nOldPosition = nPosition;   // Store the previous position value.
+
+			CString strField = strFields.Tokenize(strDelimiters, nPosition);
+			if (nPosition != -1) {
+				nTotalFields += (nPosition - nOldPosition - strField.GetLength());
+			}
+			else {
+				nTotalFields += (strFields.GetLength() + 1 - nOldPosition);
+			}
+
+			// By using SetAtGrow(), empty strings are automatically added to the array.
+			arFields.SetAtGrow(nTotalFields - 1, strField);
+
+		} while (nPosition != -1 && nPosition <= strFields.GetLength());
+	}
+}
+
+void CPlayerPlaylistBar::TSaveSettings()
+{
+	CString str =L"";
+
+	if (tabs.size() > 0) {
+		CString s;
+		// the first stroke has only saved last active playlist index and tabs offset (first visible tab on tabbar)
+		s.Format(L"%d;%d;|", m_nCurPlayListIndex, cntOffset);
+		str.Append(s);
+		// only tabs, buttons don't save
+		for (size_t i = 0; i < tabs.size() - 3; i++) {
+			CString s;
+			s.Format(L"%d;%s;%d;|", tabs[i].type, tabs[i].name, tabs[i].bVisible ? 1 : 0);
+			str.Append(s);
+		}
+	}
+	CAppSettings& s = AfxGetAppSettings();
+	s.strTabs = str;
+
+}
+
+void CPlayerPlaylistBar::TGetSettings()
+{
+	CAppSettings& s = AfxGetAppSettings();
+	CString str = s.strTabs;
+	
+	CString strDelimiters = L"|";
+	CStringArray arStrokes, arFields;
+	// parse strokes
+	TTokenizer(str, strDelimiters, arStrokes);
+
+	for (int i = 0; i < arStrokes.GetCount(); i++) {
+		strDelimiters = L";";
+		CString strStroke = arStrokes[i];
+		// parse fields in stroke
+		TTokenizer(strStroke, strDelimiters, arFields);
+		if (arFields.IsEmpty()) {
+			continue;
+		}
+
+		if (i == 0) {// the first stroke has only saved last active playlist index and tabs offset (first visible tab on tabbar)
+			m_nCurPlayListIndex = _ttoi(arFields[0]);
+			cntOffset = _ttoi(arFields[1]);
+			continue;
+		}
+
+		tab tpl;
+		tpl.type = _ttoi(arFields[0]);
+		tpl.name = arFields[1];
+		tpl.fn = arFields[1] + (L".mpcpl");
+		tpl.r.SetRect(0, 0, 0, 0);
+		tpl.bVisible = _ttoi(arFields[2]);
+		tabs.push_back(tpl);
+
+		CPlaylist* pl = DNew CPlaylist;
+		m_pls.push_back(pl);
+	}
+
+	// if we have no tabs settings, create 2 tabs (default and explorer)
+	if (tabs.size() == 0) {
+		for (int i = 0; i < 2; i++) {
+			tab tpl;
+			tpl.type = i == 0 ? PLAYLIST : EXPLORER;
+			tpl.name = i == 0 ? L"Default" : L"EXPLORER";
+			tpl.fn = tpl.name + L".mpcpl";
+			tpl.r.SetRect(0, 0, 0, 0);
+			// add playlist
+			CPlaylist* pl = DNew CPlaylist;
+			m_pls.push_back(pl);
+			// add tab
+			tabs.push_back(tpl);
+		}
+	}
+
+	// + create 3 buttons (menu, left arrow, right arrow)
+	for (int i = 0; i < 3; i++) {
+		tab tpl;
+		tpl.type = BUTTON;
+		tpl.name = i == 0 ? L"::" : i == 1 ? L">" : L"<";
+		tpl.fn = L"";
+		tpl.r.SetRect(0, 0, 0, 0);
+		tpl.bVisible = i == 0 ? true : false;
+		tabs.push_back(tpl);
+	}
+
+	if (m_nCurPlayListIndex > tabs.size() - 3)
+		m_nCurPlayListIndex = 0;
+
+	
+}
+
+void CPlayerPlaylistBar::TSetOffset(bool toRight)
+{
+	if (toRight) {
+		for (size_t i = 1; i < tabs.size() - 3; i++) {
+			if (tabs[i].r.left == rcTPage.left) {
+				if (cntOffset > 0)
+					cntOffset--;
+				return;
+			}
+		}
+		return;
+	}
+	
+	for (size_t i = 0; i < tabs.size() - 4; i++) {
+		if (tabs[i].r.left == rcTPage.left) {
+			cntOffset++;
+			return;
+		}
+	}
+}
+
+int CPlayerPlaylistBar::TGetFontSize()
+{
+	NONCLIENTMETRICS ncm = { sizeof(NONCLIENTMETRICS) };
+	VERIFY(SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0));
+
+	auto& lf = ncm.lfMessageFont;
+
+	return iTFontSize = lf.lfHeight = m_pMainFrame->ScaleSystemToMonitorY(lf.lfHeight)
+		* AfxGetAppSettings().iPlsFontPercent / 100
+		* (m_pMainFrame->GetDPIScalePercent() / 100);
+}
+
+void CPlayerPlaylistBar::TEnsureVisible(int idx)
+{
+	if (tabs[idx].r.left >= rcTPage.left && tabs[idx].r.right <= rcTPage.right) {
+		return;
+	}
+
+	if (tabs[idx].r.left < rcTPage.left) {
+		for (size_t i = idx; i < tabs.size() - 3; i++) {
+			if (cntOffset > 0) {
+				cntOffset--;
+			}
+			if (tabs[i].r.left + tabs[i].r.Width() == rcTPage.left) {
+				return;
+			}
+		}
+	} else if (tabs[idx].r.left > rcTPage.left && tabs[idx].r.right > rcTPage.right) {
+		int ftab = TGetFirstVisible();
+		int tempOffset = 0;
+		do {
+			tempOffset += tabs[ftab].r.Width();
+			ftab++;
+			cntOffset++;
+		} while (tabs[idx].r.right - tempOffset > rcTPage.right && tabs[idx].r.Width() <= rcTPage.Width());
+	}
+}
+
+int CPlayerPlaylistBar::TGetFirstVisible()
+{
+	int idx = -1;
+	for (size_t i = 0; i < tabs.size() - 3; i++) {
+		idx++;
+		if (tabs[i].r.left == rcTPage.left) {
+			return idx;
+		}
+
+	}
+	return idx;
+}
+
+COLORREF CPlayerPlaylistBar::TColorBrightness(int lSkale, COLORREF color)
+{
+	int red = lSkale > 0 ? std::min(GetRValue(color) + lSkale, 255) : std::max(0, GetRValue(color) + lSkale);
+	int green = lSkale > 0 ? std::min(GetGValue(color) + lSkale, 255) : std::max(0, GetGValue(color) + lSkale);
+	int blue = lSkale > 0 ? std::min(GetBValue(color) + lSkale, 255) : std::max(0, GetBValue(color) + lSkale);
+
+	return RGB(red, green, blue);
+}
+
+void CPlayerPlaylistBar::TSetColor()
+{
+	if (AfxGetAppSettings().bUseDarkTheme) {
+		m_crBkBar = ThemeRGB(45, 50, 55); //60,65,70 // background tab bar
+
+		m_crBN = m_crBkBar;// TColorBrightness(0, m_crBkBar);	// backgroung normal
+		m_crBNL = TColorBrightness(+15, m_crBN);		// backgroung normal lighten (for light edge)
+		m_crBND = TColorBrightness(-15, m_crBN);		// backgroung normal darken (for dark edge)
+
+		m_crBS = TColorBrightness(-15, m_crBN);		// backgroung selected background
+		m_crBSL = TColorBrightness(+30, m_crBS);		// backgroung selected lighten (for light edge)
+		m_crBSD = TColorBrightness(-15, m_crBS);		// backgroung selected darken (for dark edge)
+
+		m_crBH = TColorBrightness(+20, m_crBN);		// backgroung highlighted background
+		m_crBHL = TColorBrightness(+15, m_crBH);		// backgroung highlighted lighten (for light edge)
+		m_crBHD = TColorBrightness(-30, m_crBH);		// backgroung highlighted darken (for dark edge)
+
+		m_crBSH = TColorBrightness(-20, m_crBN);		// backgroung selected highlighted background
+		m_crBSHL = TColorBrightness(+40, m_crBSL);		// backgroung selected highlighted lighten (for light edge)
+		m_crBSHD = TColorBrightness(-0, m_crBSH);		// backgroung selected highlighted darken (for dark edge)
+
+		m_crTN = TColorBrightness(+60, m_crBN);		// text normal
+		m_crTH = TColorBrightness(+80, m_crTN);		// text normal lighten
+		m_crTS = AfxGetAppSettings().clrFaceABGR; //TColorBrightness(-80, m_crTN);		// text selected
+
+	}
+	else {
+		m_crBkBar = GetSysColor(COLOR_BTNFACE); // background tab bar
+
+		m_crBN = m_crBkBar;	// backgroung normal
+		m_crBNL = TColorBrightness(+15, m_crBN);		// backgroung normal lighten (for light edge)
+		m_crBND = TColorBrightness(-15, m_crBN);		// backgroung normal darken (for dark edge)
+
+		m_crBS = 0x00f1dacc;		// backgroung selected background
+		m_crBSL = 0xc56a31;		// backgroung selected lighten (for light edge)
+		m_crBSD = TColorBrightness(-15, m_crBS);		// backgroung selected darken (for dark edge)
+
+		m_crBH = 0x00f1dacc;		// backgroung highlighted background
+		m_crBHL = TColorBrightness(+15, m_crBH);		// backgroung highlighted lighten (for light edge)
+		m_crBHD = TColorBrightness(-30, m_crBH);		// backgroung highlighted darken (for dark edge)
+
+		m_crBSH = TColorBrightness(+20, m_crBS);		// backgroung selected highlighted background
+		m_crBSHL =TColorBrightness(-20, m_crBSL);		// backgroung selected highlighted lighten (for light edge)
+		m_crBSHD = TColorBrightness(-0, m_crBSH);		// backgroung selected highlighted darken (for dark edge)
+
+		m_crTN = RGB(50, 50, 50); // text normal
+		m_crTH = RGB(0, 0, 0); // text normal lighten
+		m_crTS = 0xff;// text selected
+
+		
+	}
+}
+
+int CPlayerPlaylistBar::TGetOffset()
+{
+
+	CClientDC dc(this);
+	CDC mdc;
+	mdc.CreateCompatibleDC(&dc);
+
+	NONCLIENTMETRICS ncm = { sizeof(NONCLIENTMETRICS) };
+	VERIFY(SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0));
+
+	auto& lf = ncm.lfMessageFont;
+	iTFontSize = lf.lfHeight = m_pMainFrame->ScaleSystemToMonitorY(lf.lfHeight)
+		* AfxGetAppSettings().iPlsFontPercent / 100
+		* (m_pMainFrame->GetDPIScalePercent() / 100);
+
+	CFont font;
+	font.CreateFontIndirect(&lf);
+
+	mdc.SelectObject(&font);
+	int widthOffset = 0;
+	for (size_t i = 0; i < cntOffset; i++) {
+		widthOffset += mdc.GetTextExtent(tabs[i].name).cx + WIDTH_TABBUTTON;
+	}
+
+	mdc.DeleteDC();
+
+	return widthOffset;
+}
+
+bool CPlayerPlaylistBar::TNavigate()
+{
+	if (TGetPlaylistType() == EXPLORER) {
+		m_list.SetFocus();
+
+		int item = m_list.GetNextItem(-1, LVNI_SELECTED);
+		if (item < 0) item++;
+		POSITION pos = FindPos(item);
+		const CPlaylistItem& pli = curPlayList.GetAt(pos);
+
+		CString path = L"";
+		for (const auto& fi : pli.m_fns) {
+			path = fi.GetName();
+		}
+
+		CString strDelimiters = L"\\";
+		CStringArray arFields;
+		CString strParentPath = L"";
+
+		path = L".\\" + path;
+		TTokenizer(path, strDelimiters, arFields);
+
+		int obj = -1;
+		path.Empty();
+		CString oldpath = L"";
+
+		for (int i = 0; i < arFields.GetCount(); i++) {
+			if (i == 0) {
+				continue;
+			}
+			if (i == arFields.GetCount() - 1) { // last field
+
+				if (arFields[i] == L"<") {
+					obj = PARENT;
+					oldpath = path;
+					oldpath.TrimRight(L"\\");
+					
+					if (arFields[i - 2] == L".") {
+						path = L".\\";
+
+					}
+					else {
+						// get parent folder
+						path.TrimRight(L"\\");
+						path.TrimRight(arFields[i - 1]);
+					}
+				}
+				else if (arFields[i].Right(1) == L":") {
+					obj = DRIVE;
+					path += arFields[i];
+					path.Append(L"\\");
+
+				}
+				else if (arFields[i].Right(1) == L">") {
+					obj = FOLDER;
+					
+					arFields[i].TrimRight(L">");
+					path += arFields[i];
+					path.Append(L"\\");
+				}
+				else {
+					return false;
+				}
+				continue;
+			}
+			path += arFields[i];
+			path.Append(L"\\");
+		}
+		curPlayList.RemoveAll();
+		m_list.DeleteAllItems();
+
+		TParseFolder(path);
+		Refresh();
+
+		obj == PARENT ? TSelectFolder(oldpath) : SetFirst(); // set selection and focus
+
+		//TDrawBar();
+		return true;
+	}
+	return false;
+}
+
+bool CPlayerPlaylistBar::TSelectFolder(CString path)
+{
+	if (path.IsEmpty()) {
+		return false;
+	}
+	POSITION pos = curPlayList.GetHeadPosition();
+	while (pos) {
+		CPlaylistItem& pli = curPlayList.GetAt(pos);
+		
+		if (pli.FindFolder(path)) {
+			
+			curPlayList.SetPos(pos);
+			EnsureVisible(pos, false);
+			return true;
+		}
+		curPlayList.GetNext(pos);
+	}
+	return false;
+}
+
