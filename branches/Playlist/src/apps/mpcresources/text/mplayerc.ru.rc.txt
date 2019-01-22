@@ -130,6 +130,13 @@ BEGIN DIALOGEX IDD_OPEN_DLG LINES 18
 17		"Вставлять URL из буфера обмена"
 END
 
+BEGIN DIALOGEX IDD_PLAYLISTNAME LINES 10
+3		"Новое имя плейлиста"
+6		"ОК"
+7		"Отмена"
+9		"Название:"
+END
+
 BEGIN DIALOGEX IDD_PNSPRESET_DLG LINES 22
 3		"Предустановки размеров и положений"
 12		"Новый"
