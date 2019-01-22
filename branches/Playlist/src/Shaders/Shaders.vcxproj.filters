@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <FxCompile Include="Resizers\resizer_bicubic06_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bicubic06_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bicubic08_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bicubic08_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bicubic10_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bicubic10_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bspline4_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_bspline4_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_catmull4_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_catmull4_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_lanczos2_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_lanczos2_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_lanczos3_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_lanczos3_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_mitchell4_x.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\resizer_mitchell4_y.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\halfoverunder_to_interlace.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\ycgco_correction.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\final_pass.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\st2084_correction.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\hlg_correction.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\downscaler.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\downscaler_box.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Resizers\downscaler_simple.hlsl">
+      <Filter>Resizers</Filter>
+    </FxCompile>
+    <FxCompile Include="Transformation\chroma_422_correction.hlsl">
+      <Filter>Transformation</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="OnePassResizers\resizer_bicubic_base.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_bilinear.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_nearest.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_bicubic06.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_bicubic08.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_bicubic10.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_catmull4.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\downscaler_simple.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_mitchell4.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_smootherstep.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="OnePassResizers\resizer_bspline4.hlsl">
+      <Filter>OnePassResizers</Filter>
+    </None>
+    <None Include="Resizers\resizer_bicubic_base_x.hlsl">
+      <Filter>Resizers</Filter>
+    </None>
+    <None Include="Resizers\resizer_bicubic_base_y.hlsl">
+      <Filter>Resizers</Filter>
+    </None>
+    <None Include="Resizers\downscaler_filters.hlsl">
+      <Filter>Resizers</Filter>
+    </None>
+    <None Include="Transformation\colorspace_gamut_conversion.hlsl">
+      <Filter>Transformation</Filter>
+    </None>
+    <None Include="Transformation\conv_matrix.hlsl">
+      <Filter>Transformation</Filter>
+    </None>
+    <None Include="Transformation\hdr_tone_mapping.hlsl">
+      <Filter>Transformation</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="OnePassResizers">
+      <UniqueIdentifier>{b1862738-ccad-4f73-addf-54f3c5ad2b35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resizers">
+      <UniqueIdentifier>{8040891c-2c56-4ccd-b5f2-51d46d8e143e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Transformation">
+      <UniqueIdentifier>{47767572-f2ee-4b2b-af5a-6a3abe6d6e94}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
