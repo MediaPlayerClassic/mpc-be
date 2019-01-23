@@ -2767,6 +2767,22 @@ BOOL CPlayerPlaylistBar::OnToolTipNotify(UINT id, NMHDR* pNMHDR, LRESULT* pResul
 
 void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 {
+	CRect rcBar;
+	GetClientRect(&rcBar);
+	rcBar.bottom = rcBar.top + abs(iTFontSize) * 2;
+
+	CPoint pt;
+	GetCursorPos(&pt);
+	ScreenToClient(&pt);
+
+	if (rcBar.PtInRect(pt)) {
+		TOnMenu(true);
+		return;
+	}
+	//else if (WindowFromPoint(pt) == &m_list) {
+	//
+	//}
+	
 	if (p.x == -1 && p.y == -1 && m_list.GetSelectedCount()) {
 		// hack for the menu invoked with the VK_APPS key
 		POSITION pos = m_list.GetFirstSelectedItemPosition();
@@ -3362,15 +3378,20 @@ void CPlayerPlaylistBar::TDrawBar()
 	}
 }
 
-void CPlayerPlaylistBar::TOnMenu()
+void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 {
 	m_button_idx = -1;
 
 	CPoint p;
-	p.x = m_tabs[m_tabs.size() - 3].r.left;
-	p.y = m_tabs[m_tabs.size() - 3].r.bottom;
-	ClientToScreen(&p);
-
+	if (bUnderCursor) {
+		GetCursorPos(&p);
+	}
+	else {
+		p.x = m_tabs[m_tabs.size() - 3].r.left;
+		p.y = m_tabs[m_tabs.size() - 3].r.bottom;
+		ClientToScreen(&p);
+	}
+	
 	CMenu menu;
 	menu.CreatePopupMenu();
 

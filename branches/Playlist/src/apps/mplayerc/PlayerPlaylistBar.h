@@ -250,7 +250,7 @@ private:
 	void TGetSettings();
 	void TSaveSettings();
 	void TSelectTab();
-	void TOnMenu();
+	void TOnMenu(bool bUnderCurcor = false);
 	void TSetOffset(bool toRight = false);
 	void TEnsureVisible(int idx);
 
