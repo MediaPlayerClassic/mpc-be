@@ -242,6 +242,8 @@ private:
 	};
 	std::vector<tab> m_tabs;
 
+	std::map<CString, HICON> m_icons;
+
 	void TDrawBar();
 	void TCalcLayout();
 	void TIndexHighighted();

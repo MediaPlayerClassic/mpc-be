@@ -751,6 +751,10 @@ CPlayerPlaylistBar::~CPlayerPlaylistBar()
 	for (auto& pl : m_pls) {
 		SAFE_DELETE(pl);
 	}
+
+	for (auto&[key, icon] : m_icons) {
+		DestroyIcon(icon);
+	}
 }
 
 BOOL CPlayerPlaylistBar::Create(CWnd* pParentWnd, UINT defDockBarID)
@@ -819,6 +823,11 @@ void CPlayerPlaylistBar::ScaleFontInternal()
 
 void CPlayerPlaylistBar::ScaleFont()
 {
+	for (auto&[key, icon] : m_icons) {
+		DestroyIcon(icon);
+	}
+	m_icons.clear();
+
 	ScaleFontInternal();
 	ResizeListColumn();
 	TCalcLayout();
@@ -2245,7 +2254,6 @@ void CPlayerPlaylistBar::OnPaint()
 {
 	CPaintDC dc(this);
 	TDrawBar();
-
 }
 
 void CPlayerPlaylistBar::OnCustomdrawList(NMHDR* pNMHDR, LRESULT* pResult)
@@ -2373,22 +2381,16 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 			pDC->TextOut(timept.x, timept.y, time);
 		}
 	}
-	
-	CString fmt, file;
 
+	CString fmt, file;
 	fmt.Format(L"%%0%dd. %%s", (int)log10(0.1 + curPlayList.GetCount()) + 1);
 	file.Format(fmt, nItem + 1, m_list.GetItemText(nItem, COL_NAME));
-	CSize filesize = pDC->GetTextExtent(file);
 	
 	int offset = 0;
 	if (TGetPlaylistType() == EXPLORER) {
 		file = m_list.GetItemText(nItem, COL_NAME);
-		int w = rcItem.Height() - 4;
-		SHFILEINFO shFileInfo;
-		UINT flag = SHGFI_ICON | SHGFI_USEFILEATTRIBUTES;
-		flag |= w > 24 ? SHGFI_LARGEICON : SHGFI_SMALLICON;
-
-		//CString strFSObject = m_list.GetItemText(nItem, COL_NAME);
+		const int w = rcItem.Height() - 4;
+		
 		bool bfsFolder = false;
 		if (file.Right(1) == L"<") {
 			file = L"[..]";
@@ -2399,36 +2401,66 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 			file = L"[" + file + L"]";
 			bfsFolder = true;
 		}
+
+		SHFILEINFOW shFileInfo;
+		UINT uFlags = SHGFI_ICON | (w > 24 ? SHGFI_LARGEICON : SHGFI_SMALLICON);
+
 		// to do special icon(UP ARROW) for [..]
-		if (bfsFolder) { // draw FolderIcon
-			SHGetFileInfo(L"111", FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFO), flag);
-			HICON hicon = (HICON)shFileInfo.hIcon;
-			DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hicon, w, w, 0, nullptr, DI_NORMAL);
-			DestroyIcon(hicon);
-		}
-		else { // draw FileIcon
-			CString path;
-			path.Preallocate(MAX_PATH);
-			POSITION pos = FindPos(nItem);
-			const CPlaylistItem& pli = curPlayList.GetAt(pos);
-			for (const auto& fi : pli.m_fns) {
-				path = fi.GetName();
+		HICON hIcon = nullptr;
+		if (bfsFolder) { // draw Folder Icon
+			const CString path(L"_folder_");
+			const auto it = m_icons.find(path);
+			if (it != m_icons.cend()) {
+				hIcon = it->second;
 			}
-			SHGetFileInfo(path, 0, &shFileInfo, sizeof(SHFILEINFO), flag);
-			HICON hicon = (HICON)shFileInfo.hIcon;
-			DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hicon, w, w, 0, nullptr, DI_NORMAL);
-			DestroyIcon(hicon);
+			else {
+				uFlags |= SHGFI_USEFILEATTRIBUTES;
+				SHGetFileInfoW(path, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+				hIcon = shFileInfo.hIcon;
+				m_icons[path] = hIcon;
+			}
 		}
+		else { // draw Files Icon
+			CString path;
+			POSITION pos = FindPos(nItem);
+			if (pos) {
+				const CPlaylistItem& pli = curPlayList.GetAt(pos);
+				if (!pli.m_fns.empty()) {
+					path = pli.m_fns.front().GetName();
+				}
+			}
+
+			auto ext = GetFileExt(path).MakeLower();
+			if (ext.IsEmpty() && path.Right(1) == L":") {
+				ext = path;
+			}
+			const auto it = m_icons.find(ext);
+			if (it != m_icons.cend()) {
+				hIcon = it->second;
+			}
+			else {
+				SHGetFileInfoW(path, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+				hIcon = shFileInfo.hIcon;
+				m_icons[ext] = hIcon;
+			}
+		}
+
+		DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hIcon, w, w, 0, nullptr, DI_NORMAL);
 
 		offset = rcItem.Height();
 	}
+
+	CSize filesize = pDC->GetTextExtent(file);
+	filesize.cx += offset;
 	while (3 + filesize.cx + 6 > timept.x && file.GetLength() > 3) {
 		file = file.Left(file.GetLength() - 4) + L"...";
 		filesize = pDC->GetTextExtent(file);
+		filesize.cx += offset;
 	}
+
 	if (file.GetLength() > 3 || TGetPlaylistType() == EXPLORER) { // L"C:".GetLenght() < 3 
 		pDC->SetTextColor(textcolor);
-		pDC->TextOut(rcItem.left + 3 + offset, (rcItem.top + rcItem.bottom - filesize.cy) / 2, file);
+		pDC->TextOutW(rcItem.left + 3 + offset, (rcItem.top + rcItem.bottom - filesize.cy) / 2, file);
 	}
 }
 
@@ -2806,7 +2838,7 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 	if (pos) {
 		CPlaylistItem& pli = curPlayList.GetAt(pos);
 		if (!pli.m_fns.empty()) {
-			sCurrentPath = pli.m_fns.cbegin()->GetName();
+			sCurrentPath = pli.m_fns.front().GetName();
 			bMIEnable = !::PathIsURLW(sCurrentPath) && sCurrentPath != L"pipe://stdin";
 		}
 	}
@@ -3968,7 +4000,7 @@ bool CPlayerPlaylistBar::TNavigate()
 
 		CString path;
 		if (!pli.m_fns.empty()) {
-			path = pli.m_fns.cbegin()->GetName();
+			path = pli.m_fns.front().GetName();
 		}
 
 		path = L".\\" + path;
