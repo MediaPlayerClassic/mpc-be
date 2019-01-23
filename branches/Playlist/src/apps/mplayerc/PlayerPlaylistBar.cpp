@@ -1221,8 +1221,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 	CWebTextFile f(CTextFile::UTF8, CTextFile::ANSI);
 	if (!f.Open(fn) || !f.ReadString(str) || str != L"MPCPLAYLIST" || f.GetLength() > MEGABYTE) {
 		if (m_tabs[m_nCurPlayListIndex].type == EXPLORER) {
-			CString path = L".\\";
-			TParseFolder(path);
+			TParseFolder(L".\\");
 		}
 		return false;
 	}
@@ -1256,7 +1255,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 					selected_idx = i - 1;
 				}
 			} else if (key == L"filename") {
-				value = TGetPlaylistType() == 0 ? MakePath(CombinePath(base, value)) : value;
+				value = TGetPlaylistType() == PLAYLIST ? MakePath(CombinePath(base, value)) : value;
 				pli[i].m_fns.push_back(value);
 			} else if (key == L"subtitle") {
 				value = CombinePath(base, value);
@@ -1292,8 +1291,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 	}
 
 	if (m_tabs[m_nCurPlayListIndex].type == EXPLORER && curPlayList.IsEmpty()) {
-		CString path = L".\\";
-		TParseFolder(path);
+		TParseFolder(L".\\");
 	}
 
 	if (bIsEmpty && selected_idx >= 0 && selected_idx < curPlayList.GetCount()) {
@@ -2068,8 +2066,10 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 
 void CPlayerPlaylistBar::SavePlaylist()
 {
-	if (m_tabs[m_nCurPlayListIndex].type == 2)
+	if (m_tabs[m_nCurPlayListIndex].type == BUTTON) {
 		return;
+	}
+
 	CString base;
 
 	if (AfxGetMyApp()->GetAppSavePath(base)) {
@@ -2086,6 +2086,7 @@ void CPlayerPlaylistBar::SavePlaylist()
 			::DeleteFileW(file);
 		}
 	}
+
 	TSaveSettings();
 }
 
@@ -2222,7 +2223,6 @@ void CPlayerPlaylistBar::OnNMDblclkList(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 	else if (TGetPlaylistType() == EXPLORER) {
 		if (TNavigate()) {
-			;
 		}
 		else if (lpnmlv->iItem >= 0 && lpnmlv->iSubItem >= 0) {
 			POSITION pos = FindPos(lpnmlv->iItem);
@@ -2867,7 +2867,7 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 
 	CAppSettings& s = AfxGetAppSettings();
 
-	bool bExplorer = TGetPlaylistType() == EXPLORER;
+	const bool bExplorer = TGetPlaylistType() == EXPLORER;
 	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_OPEN, ResStr(IDS_PLAYLIST_OPEN) + L"\tSpace");
 	m.AppendMenu(MF_STRING | (!bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_ADD, ResStr(IDS_PLAYLIST_ADD));
 	m.AppendMenu(MF_STRING | (bOnItem && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_REMOVE, ResStr(IDS_PLAYLIST_REMOVE) + L"\tDelete");
@@ -2906,14 +2906,18 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 	int nID = (int)m.TrackPopupMenu(TPM_LEFTBUTTON | TPM_RETURNCMD, p.x, p.y, this);
 	switch (nID) {
 		case M_OPEN:
-			if (TNavigate()) return;
+			if (TNavigate()) {
+				return;
+			}
 			curPlayList.SetPos(pos);
 			m_list.Invalidate();
 			m_pMainFrame->OpenCurPlaylistItem();
 			break;
 		case M_ADD:
 			{
-			if (bExplorer) return;
+				if (bExplorer) {
+					return;
+				}
 				if (m_pMainFrame->GetPlaybackMode() == PM_CAPTURE) {
 					m_pMainFrame->AddCurDevToPlaylist();
 					curPlayList.SetPos(curPlayList.GetTailPosition());
@@ -2946,7 +2950,9 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 		case M_REMOVE:
 		case M_DELETE:
 			{
-			if (bExplorer) return;
+				if (bExplorer) {
+					return;
+				}
 				std::vector<int> items;
 				items.reserve(m_list.GetSelectedCount());
 				POSITION pos = m_list.GetFirstSelectedItemPosition();
@@ -2958,7 +2964,9 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 			}
 			break;
 		case M_CLEAR:
-			if (bExplorer) return;
+			if (bExplorer) {
+				return;
+			}
 			if (Empty()) {
 				m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
 			}
@@ -3648,20 +3656,14 @@ void CPlayerPlaylistBar::TSelectTab()
 	TDrawBar();
 }
 
-void CPlayerPlaylistBar::TParseFolder(CString path)
+void CPlayerPlaylistBar::TParseFolder(const CString& path)
 {
 	CAppSettings& s = AfxGetAppSettings();
 	CMediaFormats& mf = s.m_Formats;
 
-	WIN32_FIND_DATA FindFileData;
-	HANDLE hFind;
-
 	if (path == L".\\") { // root
-
 		int nPos = 0;
-		UINT nCount = 0;
 		CString strDrive = "?:\\";
-
 		DWORD dwDriveList = ::GetLogicalDrives();
 
 		while (dwDriveList) {
@@ -3675,64 +3677,51 @@ void CPlayerPlaylistBar::TParseFolder(CString path)
 			dwDriveList >>= 1;
 			nPos++;
 		}
+
 		return;
 	}
 
-	const CString Path = path;
-	const CString mask = Path + L"*.*";
-
-	hFind = FindFirstFile(mask, &FindFileData);
-
 	CPlaylistItem pli;
-	pli.m_fns.push_front(Path + L"<"); // Parent folder mark;
+	pli.m_fns.push_front(path + L"<"); // Parent folder mark;
 	curPlayList.AddTail(pli);
 
+	std::vector<CString> files;
+
+	const CString mask = path + L"*.*";
+	WIN32_FIND_DATAW FindFileData = {};
+	HANDLE hFind = FindFirstFileW(mask, &FindFileData);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
-			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY
-					&& FindFileData.cFileName != CString(".")
-					&& FindFileData.cFileName != CString("..")
-					&& FindFileData.cFileName != CString("System Volume Information")
-					&& FindFileData.cFileName != CString("$RECYCLE.BIN")
-					&& FindFileData.cFileName != CString("$Recycle.Bin")) {
-				CString path2 = Path + FindFileData.cFileName + L">"; // Folders mark
+			const CString fileName = FindFileData.cFileName;
 
-				CPlaylistItem pli;
-				pli.m_fns.push_front(path2);
-				curPlayList.AddTail(pli);
-			}
-		} while (::FindNextFile(hFind, &FindFileData));
-		::FindClose(hFind);
-
-		hFind = FindFirstFile(mask, &FindFileData);
-		do {
-
-			if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-				const CString ext = GetFileExt(FindFileData.cFileName).MakeLower();
-				if (mf.FindExt(ext)) {
+			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				if (fileName != L"." && fileName != L".." && fileName != L"System Volume Information"
+						&& fileName != L"$RECYCLE.BIN" && fileName != L"$Recycle.Bin") {
 					CPlaylistItem pli;
-					pli.m_fns.push_front(Path + FindFileData.cFileName); // Files
+					pli.m_fns.push_front(path + fileName + L">"); // Folders mark
 					curPlayList.AddTail(pli);
 				}
 			}
-		} while (::FindNextFile(hFind, &FindFileData));
+			else {
+				const CString ext = GetFileExt(FindFileData.cFileName).MakeLower();
+				if (mf.FindExt(ext)) {
+					files.push_back(path + fileName);
+				}
+			}
+		} while (::FindNextFileW(hFind, &FindFileData));
 		::FindClose(hFind);
+	}
+
+	for (const auto& file : files) {
+		CPlaylistItem pli;
+		pli.m_fns.push_front(file);
+		curPlayList.AddTail(pli);
 	}
 }
 
-int CPlayerPlaylistBar::TGetPlaylistType()
+int CPlayerPlaylistBar::TGetPlaylistType() const
 {
-	int Ret = 0;
-	if (m_tabs[m_nCurPlayListIndex].type == PLAYLIST) {
-		Ret = 0;
-	}
-	else if (m_tabs[m_nCurPlayListIndex].type == EXPLORER) {
-		Ret = 1;
-	}
-	else {
-		Ret = 2; // == BUTTONS
-	}
-	return Ret;
+	return m_tabs[m_nCurPlayListIndex].type;
 }
 
 void CPlayerPlaylistBar::TTokenizer(const CString& strFields, LPCWSTR strDelimiters, std::vector<CString>& arFields)

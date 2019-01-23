@@ -248,7 +248,7 @@ private:
 	void TCalcLayout();
 	void TIndexHighighted();
 	void TTokenizer(const CString& strFields, LPCWSTR strDelimiters, std::vector<CString>& arFields);
-	void TParseFolder(CString path);
+	void TParseFolder(const CString& path);
 	void TGetSettings();
 	void TSaveSettings();
 	void TSelectTab();
@@ -262,7 +262,7 @@ private:
 
 	int TGetFirstVisible();
 	int TGetOffset();
-	int TGetPlaylistType();
+	int TGetPlaylistType() const;
 	int TGetFontSize();
 	int iTFontSize;
 	bool TNavigate();
