@@ -1,6 +1,6 @@
 /*
  * (C) 2003-2006 Gabest
- * (C) 2006-2018 see Authors.txt
+ * (C) 2006-2019 see Authors.txt
  *
  * This file is part of MPC-BE.
  *
@@ -214,11 +214,57 @@ private:
 	CFont m_font;
 	void ScaleFontInternal();
 
-	HANDLE m_hStopEvent;
-
 	bool m_bSingleElement = false;
 
-	int bt_idx = -1;
+	int m_button_idx = -1;
+
+#define WIDTH_TABBUTTON 20
+	enum {
+		PLAYLIST,
+		EXPLORER,
+		BUTTON
+	};
+
+	enum {
+		ROOT,
+		DRIVE,
+		FOLDER,
+		PARENT,
+		FILE
+	};
+
+	struct tab {
+		UINT type = PLAYLIST; //
+		CString name;         // playlist label
+		CString fn;           // file playlist name
+		CRect r;              // layout
+		bool bVisible = true;
+	};
+	std::vector<tab> m_tabs;
+
+	void TDrawBar();
+	void TCalcLayout();
+	void TIndexHighighted();
+	void TTokenizer(const CString& strFields, LPCWSTR strDelimiters, std::vector<CString>& arFields);
+	void TParseFolder(CString path);
+	void TGetSettings();
+	void TSaveSettings();
+	void TSelectTab();
+	void TOnMenu();
+	void TSetOffset(bool toRight = false);
+	void TEnsureVisible(int idx);
+
+	COLORREF TColorBrightness(int lSkale, COLORREF color);
+	CRect rcTPage;
+	size_t cntOffset;
+
+	int TGetFirstVisible();
+	int TGetOffset();
+	int TGetPlaylistType();
+	int TGetFontSize();
+	int iTFontSize;
+	bool TNavigate();
+	bool TSelectFolder(CString path);
 
 	COLORREF m_crBkBar;
 
@@ -263,58 +309,9 @@ public:
 		return *m_pls[m_nCurPlayListIndex];
 	}
 #define curPlayList GetCurPlayList()
-#define WIDTH_TABBUTTON 20
-	enum {
-		PLAYLIST,
-		EXPLORER,
-		BUTTON
-	};
 
-	enum {
-		ROOT,
-		DRIVE,
-		FOLDER,
-		PARENT,
-		FILE
-	};
-
-	struct tab {
-		UINT type = PLAYLIST; // 0:playlist, 1:explorer, 2:button (+-<>)
-		CString name = L""; // playlist label
-		CString fn = L""; // file playlist name
-		CRect r; // layout
-		bool bVisible = true;
-	};
-	std::vector<tab> tabs;
-
-	std::vector<CStringArray> arArrays;
-
-	void TDrawBar();
-	void TCalcLayout();
-	void TIndexHighighted();
-	void TTokenizer(const CString& strFields, const CString& strDelimiters, CStringArray& arFields);
-	void TParseFolder(CString path);
-	void TGetSettings();
-	void TSaveSettings();
-	void TSelectTab();
-	void TOnMenu();
-	void TDeletePlaylist();
-	void TDeleteAllPlaylists();
 	void TSetColor();
-	void TSetOffset(bool toRight = false);
-	void TEnsureVisible(int idx);
-
-	COLORREF TColorBrightness(int lSkale, COLORREF color);
-	CRect rcTPage;
-	size_t cntOffset;
-
-	int TGetFirstVisible();
-	int TGetOffset();
-	int TGetPlaylistType();
-	int TGetFontSize();
-	int iTFontSize;
-	bool TNavigate();
-	bool TSelectFolder(CString path);
+	void TDeleteAllPlaylists();
 
 	int GetCount();
 	int GetSelIdx();

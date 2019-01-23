@@ -1,6 +1,5 @@
 /*
- * (C) 2003-2006 Gabest
- * (C) 2006-2018 see Authors.txt
+  * (C) 2019 see Authors.txt
  *
  * This file is part of MPC-BE.
  *
@@ -22,16 +21,10 @@
 #include "stdafx.h"
 #include "PlaylistNameDlg.h"
 
- // CAddPlaylistDlg dialog
-
 IMPLEMENT_DYNAMIC(CPlaylistNameDlg, CCmdUIDialog)
-CPlaylistNameDlg::CPlaylistNameDlg(CString& str, CWnd* pParent/* = nullptr*/)
+CPlaylistNameDlg::CPlaylistNameDlg(const CString& str, CWnd* pParent/* = nullptr*/)
 	: CCmdUIDialog(CPlaylistNameDlg::IDD, pParent)
 	, m_name(str)
-{
-}
-
-CPlaylistNameDlg::~CPlaylistNameDlg()
 {
 }
 
@@ -46,11 +39,10 @@ BOOL CPlaylistNameDlg::OnInitDialog()
 {
 	__super::OnInitDialog();
 
-
 	UpdateData(FALSE);
 	
-	GetDlgItem(IDC_EDIT_PLAYLISTNAME)->SetFocus();
 	//m_name = L"Playlist #";
+	m_namectrl.SetFocus();
 	m_namectrl.SetWindowText(m_name);
 	m_namectrl.SetSel(0, -1);
 
@@ -61,18 +53,9 @@ BEGIN_MESSAGE_MAP(CPlaylistNameDlg, CCmdUIDialog)
 	ON_UPDATE_COMMAND_UI(IDOK, OnUpdateOk)
 END_MESSAGE_MAP()
 
-// CAddPlaylistDlg message handlers
-
 void CPlaylistNameDlg::OnUpdateOk(CCmdUI *pCmdUI)
 {
 	UpdateData();
 
 	pCmdUI->Enable(!m_name.IsEmpty());
-}
-
-void CPlaylistNameDlg::OnOK()
-{
-	UpdateData();
-
-	CCmdUIDialog::OnOK();
 }

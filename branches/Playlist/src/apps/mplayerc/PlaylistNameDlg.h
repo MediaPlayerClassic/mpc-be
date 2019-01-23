@@ -1,6 +1,5 @@
 /*
- * (C) 2003-2006 Gabest
- * (C) 2006-2018 see Authors.txt
+  * (C) 2019 see Authors.txt
  *
  * This file is part of MPC-BE.
  *
@@ -23,21 +22,18 @@
 
 #include <ResizableLib/ResizableDialog.h>
 
- // CAddPlaylistDlg dialog
-
 class CPlaylistNameDlg : public CCmdUIDialog
 {
 	DECLARE_DYNAMIC(CPlaylistNameDlg)
 	
 public:
-	CPlaylistNameDlg(CString& str, CWnd* pParent = nullptr);
-	virtual ~CPlaylistNameDlg();
+	CPlaylistNameDlg(const CString& str, CWnd* pParent = nullptr);
+	virtual ~CPlaylistNameDlg() = default;
 
 	enum { IDD = IDD_PLAYLISTNAME };
 
 	CEdit m_namectrl;
 	CString m_name;
-	
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);
@@ -47,7 +43,4 @@ protected:
 
 public:
 	afx_msg void OnUpdateOk(CCmdUI* pCmdUI);
-protected:
-	virtual void OnOK();
 };
-#pragma once
