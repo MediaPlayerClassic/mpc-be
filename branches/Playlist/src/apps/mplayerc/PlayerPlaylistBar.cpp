@@ -3744,10 +3744,10 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 				curPlayList.AddTail(pli);
 
 				if (m_icons.find(strDrive) == m_icons.cend()) {
-					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFOW), uFlags);
 					m_icons[strDrive] = shFileInfo.hIcon;
 
-					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFOW), uFlagsLargeIcon);
 					m_icons_large[strDrive] = shFileInfo.hIcon;
 				}
 			}
@@ -3764,10 +3764,10 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 
 	const CString folder(L"_folder_");
 	if (m_icons.find(folder) == m_icons.cend()) {
-		SHGetFileInfoW(L".\\", 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+		SHGetFileInfoW(folder, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFOW), uFlags | SHGFI_USEFILEATTRIBUTES);
 		m_icons[folder] = shFileInfo.hIcon;
 
-		SHGetFileInfoW(L".\\", 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+		SHGetFileInfoW(folder, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFOW), uFlagsLargeIcon | SHGFI_USEFILEATTRIBUTES);
 		m_icons_large[folder] = shFileInfo.hIcon;
 	}
 
@@ -3805,10 +3805,10 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 
 		const auto ext = GetFileExt(file).MakeLower();
 		if (m_icons.find(ext) == m_icons.cend()) {
-			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFOW), uFlags);
 			m_icons[ext] = shFileInfo.hIcon;
 
-			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFOW), uFlagsLargeIcon);
 			m_icons_large[ext] = shFileInfo.hIcon;
 		}
 	}
