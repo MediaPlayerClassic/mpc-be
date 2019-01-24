@@ -755,6 +755,10 @@ CPlayerPlaylistBar::~CPlayerPlaylistBar()
 	for (auto&[key, icon] : m_icons) {
 		DestroyIcon(icon);
 	}
+
+	for (auto&[key, icon] : m_icons_large) {
+		DestroyIcon(icon);
+	}
 }
 
 BOOL CPlayerPlaylistBar::Create(CWnd* pParentWnd, UINT defDockBarID)
@@ -823,11 +827,6 @@ void CPlayerPlaylistBar::ScaleFontInternal()
 
 void CPlayerPlaylistBar::ScaleFont()
 {
-	for (auto&[key, icon] : m_icons) {
-		DestroyIcon(icon);
-	}
-	m_icons.clear();
-
 	ScaleFontInternal();
 	ResizeListColumn();
 	TCalcLayout();
@@ -2445,28 +2444,13 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 			bfsFolder = true;
 		}
 
-		SHFILEINFOW shFileInfo;
-		UINT uFlags = SHGFI_ICON | (w > 24 ? SHGFI_LARGEICON : SHGFI_SMALLICON);
-
-		// to do special icon(UP ARROW) for [..]
 		HICON hIcon = nullptr;
 		if (bfsFolder) { // draw Folder Icon
-			const CString path(L"_folder_");
-			const auto it = m_icons.find(path);
-			if (it != m_icons.cend()) {
-				hIcon = it->second;
-			}
-			else {
-				uFlags |= SHGFI_USEFILEATTRIBUTES;
-				SHGetFileInfoW(path, FILE_ATTRIBUTE_DIRECTORY, &shFileInfo, sizeof(SHFILEINFO), uFlags);
-				hIcon = shFileInfo.hIcon;
-				m_icons[path] = hIcon;
-			}
+			hIcon = w > 24 ? m_icons_large[L"_folder_"] : m_icons[L"_folder_"];
 		}
 		else { // draw Files Icon
 			CString path;
-			POSITION pos = FindPos(nItem);
-			if (pos) {
+			if (POSITION pos = FindPos(nItem); pos) {
 				const CPlaylistItem& pli = curPlayList.GetAt(pos);
 				if (!pli.m_fns.empty()) {
 					path = pli.m_fns.front().GetName();
@@ -2477,15 +2461,8 @@ void CPlayerPlaylistBar::OnDrawItem(int nIDCtl, LPDRAWITEMSTRUCT lpDrawItemStruc
 			if (ext.IsEmpty() && path.Right(1) == L":") {
 				ext = path;
 			}
-			const auto it = m_icons.find(ext);
-			if (it != m_icons.cend()) {
-				hIcon = it->second;
-			}
-			else {
-				SHGetFileInfoW(path, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
-				hIcon = shFileInfo.hIcon;
-				m_icons[ext] = hIcon;
-			}
+
+			hIcon = w > 24 ? m_icons_large[ext] : m_icons[ext];
 		}
 
 		DrawIconEx(pDC->m_hDC, rcItem.left + 2, rcItem.top + 2, hIcon, w, w, 0, nullptr, DI_NORMAL);
@@ -3704,6 +3681,10 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 	CAppSettings& s = AfxGetAppSettings();
 	CMediaFormats& mf = s.m_Formats;
 
+	SHFILEINFOW shFileInfo = {};
+	UINT uFlags = SHGFI_ICON | SHGFI_SMALLICON;
+	UINT uFlagsLargeIcon = SHGFI_ICON | SHGFI_LARGEICON;
+
 	if (path == L".\\") { // root
 		int nPos = 0;
 		CString strDrive = "?:\\";
@@ -3713,9 +3694,18 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 			if (dwDriveList & 1) {
 				strDrive.SetAt(0, 0x41 + nPos);
 				strDrive = strDrive.Left(2);
+
 				CPlaylistItem pli;
 				pli.m_fns.push_front(strDrive);
 				curPlayList.AddTail(pli);
+
+				if (m_icons.find(strDrive) == m_icons.cend()) {
+					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+					m_icons[strDrive] = shFileInfo.hIcon;
+
+					SHGetFileInfoW(strDrive, 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+					m_icons_large[strDrive] = shFileInfo.hIcon;
+				}
 			}
 			dwDriveList >>= 1;
 			nPos++;
@@ -3727,6 +3717,15 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 	CPlaylistItem pli;
 	pli.m_fns.push_front(path + L"<"); // Parent folder mark;
 	curPlayList.AddTail(pli);
+
+	const CString folder(L"_folder_");
+	if (m_icons.find(folder) == m_icons.cend()) {
+		SHGetFileInfoW(L".\\", 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+		m_icons[folder] = shFileInfo.hIcon;
+
+		SHGetFileInfoW(L".\\", 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+		m_icons_large[folder] = shFileInfo.hIcon;
+	}
 
 	std::vector<CString> files;
 
@@ -3759,6 +3758,15 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 		CPlaylistItem pli;
 		pli.m_fns.push_front(file);
 		curPlayList.AddTail(pli);
+
+		const auto ext = GetFileExt(file).MakeLower();
+		if (m_icons.find(ext) == m_icons.cend()) {
+			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFO), uFlags);
+			m_icons[ext] = shFileInfo.hIcon;
+
+			SHGetFileInfoW(file, 0, &shFileInfo, sizeof(SHFILEINFO), uFlagsLargeIcon);
+			m_icons_large[ext] = shFileInfo.hIcon;
+		}
 	}
 }
 

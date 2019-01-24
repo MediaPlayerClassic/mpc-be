@@ -243,6 +243,7 @@ private:
 	std::vector<tab> m_tabs;
 
 	std::map<CString, HICON> m_icons;
+	std::map<CString, HICON> m_icons_large;
 
 	void TDrawBar();
 	void TCalcLayout();
