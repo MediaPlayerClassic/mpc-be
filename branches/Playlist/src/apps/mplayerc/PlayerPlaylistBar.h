@@ -270,6 +270,7 @@ private:
 	int iTFontSize;
 	bool TNavigate();
 	bool TSelectFolder(CString path);
+	int TGetFocusedElement() const;
 
 	COLORREF m_crBkBar;
 

@@ -1817,6 +1817,10 @@ void CPlayerPlaylistBar::UpdateList()
 
 void CPlayerPlaylistBar::EnsureVisible(POSITION pos, bool bMatchPos)
 {
+	if (pos == nullptr) {
+		return;
+	}
+
 	int i = FindItem(pos);
 	if (i < 0) {
 		return;
@@ -2640,7 +2644,7 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 		__super::OnLButtonDown(nFlags, point);
 	}
 
-	if (m_tabs[m_tabs.size()-3].r.PtInRect(point)) {
+	if (m_tabs[m_tabs.size() - 3].r.PtInRect(point)) {
 		TOnMenu();
 		return;
 	}
@@ -2656,14 +2660,9 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 	}
 	else {
 		for (size_t i = 0; i < m_tabs.size() - 3; i++) {
-
 			if (m_tabs[i].r.PtInRect(point)) {
 				//SavePlaylist();
-				for (int i = 0; i < m_list.GetItemCount(); i++) {
-					if (m_list.GetItemState(i, LVIS_FOCUSED)) {
-						curPlayList.m_nFocused_idx = i;
-					}
-				}
+				curPlayList.m_nFocused_idx = TGetFocusedElement();
 				m_nCurPlayListIndex = i;
 				TSelectTab();
 				return;
@@ -3535,7 +3534,10 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 	int nID = (int)menu.TrackPopupMenu(TPM_LEFTBUTTON | TPM_RETURNCMD, p.x, p.y, this);
 	int size = m_tabs.size() - 3;
 
+	bool bNewExplorer = false;
+
 	if (nID > 0 && nID <= size) {
+		curPlayList.m_nFocused_idx = TGetFocusedElement();
 		m_nCurPlayListIndex = nID - 1;
 		TEnsureVisible(m_nCurPlayListIndex);
 		TSelectTab();
@@ -3610,6 +3612,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 
 					TSelectTab();
 					TParseFolder(L".\\");
+
+					bNewExplorer = true;
 				}
 				break;
 			case 3: // RENAME TAB
@@ -3673,6 +3677,13 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 	Refresh();
 	TCalcLayout();
 	TDrawBar();
+
+	if (bNewExplorer) {
+		EnsureVisible(FindPos(0));
+	}
+	else {
+		EnsureVisible(FindPos(curPlayList.m_nFocused_idx));
+	}
 }
 
 void CPlayerPlaylistBar::TDeleteAllPlaylists()
@@ -3715,9 +3726,9 @@ void CPlayerPlaylistBar::TSelectTab()
 	}
 
 	TCalcLayout();
-	m_list.SetItemState(curPlayList.m_nFocused_idx > -1 ? curPlayList.m_nFocused_idx : 0, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
 	EnsureVisible(FindPos(curPlayList.m_nFocused_idx));
 	TDrawBar();
+	m_list.SetFocus();
 }
 
 void CPlayerPlaylistBar::TParseFolder(const CString& path)
@@ -4192,3 +4203,13 @@ bool CPlayerPlaylistBar::TSelectFolder(CString path)
 	return false;
 }
 
+int CPlayerPlaylistBar::TGetFocusedElement() const
+{
+	for (int i = 0; i < m_list.GetItemCount(); i++) {
+		if (m_list.GetItemState(i, LVIS_FOCUSED)) {
+			return i;
+		}
+	}
+
+	return -1;
+}
