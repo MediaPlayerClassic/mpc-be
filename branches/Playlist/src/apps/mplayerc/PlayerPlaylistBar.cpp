@@ -1338,6 +1338,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 
 	if (bIsEmpty && selected_idx >= 0 && selected_idx < curPlayList.GetCount()) {
 		curPlayList.m_nSelected_idx = selected_idx - 1;
+		curPlayList.m_nFocused_idx = curPlayList.m_nSelected_idx + 1;
 	}
 
 	return pli.size() > 0;
@@ -2098,6 +2099,7 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 
 	if (curPlayList.m_nSelected_idx != INT_MAX) {
 		SetSelIdx(curPlayList.m_nSelected_idx + 1, true);
+		curPlayList.m_nFocused_idx = curPlayList.m_nSelected_idx;
 		curPlayList.m_nSelected_idx = INT_MAX;
 	}
 	else {
@@ -2657,6 +2659,11 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 
 			if (m_tabs[i].r.PtInRect(point)) {
 				//SavePlaylist();
+				for (int i = 0; i < m_list.GetItemCount(); i++) {
+					if (m_list.GetItemState(i, LVIS_FOCUSED)) {
+						curPlayList.m_nFocused_idx = i;
+					}
+				}
 				m_nCurPlayListIndex = i;
 				TSelectTab();
 				return;
@@ -3706,10 +3713,11 @@ void CPlayerPlaylistBar::TSelectTab()
 			}
 		}
 	}
+
 	TCalcLayout();
-	EnsureVisible(curPlayList.GetPos());
+	m_list.SetItemState(curPlayList.m_nFocused_idx > -1 ? curPlayList.m_nFocused_idx : 0, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
+	EnsureVisible(FindPos(curPlayList.m_nFocused_idx));
 	TDrawBar();
-	//m_list.SetFocus();
 }
 
 void CPlayerPlaylistBar::TParseFolder(const CString& path)

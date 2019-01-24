@@ -153,6 +153,7 @@ public:
 	void Randomize();
 	void ReverseSort();
 	int m_nSelected_idx = INT_MAX;
+	int m_nFocused_idx = -1;
 	POSITION GetPos() const;
 	void SetPos(POSITION pos);
 	CPlaylistItem& GetNextWrap(POSITION& pos);
