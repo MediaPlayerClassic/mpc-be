@@ -2493,6 +2493,7 @@ BOOL CPlayerPlaylistBar::OnPlayPlay(UINT nID)
 
 void CPlayerPlaylistBar::DropFiles(std::list<CString>& slFiles)
 {
+	if (TGetPlaylistType() == EXPLORER) return;
 	SetForegroundWindow();
 	m_list.SetFocus();
 
@@ -2503,6 +2504,8 @@ void CPlayerPlaylistBar::DropFiles(std::list<CString>& slFiles)
 
 void CPlayerPlaylistBar::OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
+	if (TGetPlaylistType() == EXPLORER) return;
+	
 	ModifyStyle(WS_EX_ACCEPTFILES, 0);
 
 	m_nDragIndex = ((LPNMLISTVIEW)pNMHDR)->iItem;
