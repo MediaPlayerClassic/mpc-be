@@ -2013,8 +2013,9 @@ OpenMediaData* CPlayerPlaylistBar::GetCurOMD(REFERENCE_TIME rtStart)
 
 	CString fn = pli->m_fns.front().GetName().MakeLower();
 
-	if (fn.Right(1) == L">" || fn.Right(1) == L"<" || fn.Right(1) == L":")
+	if (TGetPathType(fn) != FILE) {
 		return nullptr;
+	}
 
 	if (fn.Find(L"video_ts.ifo") >= 0
 			|| fn.Find(L".ratdvd") >= 0) {
@@ -2860,6 +2861,10 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 		if (!pli.m_fns.empty()) {
 			sCurrentPath = pli.m_fns.front().GetName();
 			bMIEnable = !::PathIsURLW(sCurrentPath) && sCurrentPath != L"pipe://stdin";
+
+			if (bMIEnable && TGetPlaylistType() == EXPLORER) {
+				bMIEnable = TGetPathType(sCurrentPath) == FILE;
+			}
 		}
 	}
 	const bool bOnItem = !!(lvhti.flags & LVHT_ONITEM);
@@ -3773,6 +3778,26 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 int CPlayerPlaylistBar::TGetPlaylistType() const
 {
 	return m_tabs[m_nCurPlayListIndex].type;
+}
+
+int CPlayerPlaylistBar::TGetPathType(const CString& path) const
+{
+	if (path.IsEmpty()) {
+		return -1;
+	}
+
+	const auto suffix = path.Right(1);
+	if (suffix == L":") {
+		return DRIVE;
+	}
+	else if (suffix == L"<") {
+		return PARENT;
+	} 
+	else if (suffix == L">") {
+		return FOLDER;
+	}
+
+	return FILE;
 }
 
 void CPlayerPlaylistBar::TTokenizer(const CString& strFields, LPCWSTR strDelimiters, std::vector<CString>& arFields)

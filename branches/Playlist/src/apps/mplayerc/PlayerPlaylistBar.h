@@ -264,6 +264,7 @@ private:
 	int TGetFirstVisible();
 	int TGetOffset();
 	int TGetPlaylistType() const;
+	int TGetPathType(const CString& path) const;
 	int TGetFontSize();
 	int iTFontSize;
 	bool TNavigate();
