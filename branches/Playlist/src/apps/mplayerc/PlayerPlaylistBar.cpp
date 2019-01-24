@@ -1290,8 +1290,51 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 		curPlayList.AddTail(pli[idx[i]]);
 	}
 
-	if (m_tabs[m_nCurPlayListIndex].type == EXPLORER && curPlayList.IsEmpty()) {
-		TParseFolder(L".\\");
+	if (m_tabs[m_nCurPlayListIndex].type == EXPLORER) {
+		CString selected_path;
+		if (bIsEmpty && selected_idx >= 0 && selected_idx < curPlayList.GetCount()) {
+			POSITION pos = curPlayList.FindIndex(selected_idx);
+			if (pos) {
+				selected_path = curPlayList.GetAt(pos).m_fns.front().GetName();
+			}
+		}
+		selected_idx = 0;
+
+		if (curPlayList.IsEmpty()) {
+			curPlayList.RemoveAll();
+			TParseFolder(L".\\");
+		}
+		else {
+			auto path = curPlayList.GetHead().m_fns.front().GetName();
+			if (path.Right(1) == L"<") {
+				path.TrimRight(L"<");
+				curPlayList.RemoveAll();
+				if (::PathFileExistsW(path)) {
+					TParseFolder(path);
+				}
+				else {
+					TParseFolder(L".\\");
+				}
+			}
+			else {
+				curPlayList.RemoveAll();
+				TParseFolder(L".\\");
+			}
+		}
+
+		if (!selected_path.IsEmpty()) {
+			int idx = 0;
+			POSITION pos = curPlayList.GetHeadPosition();
+			while (pos) {
+				CPlaylistItem& pli = curPlayList.GetAt(pos);
+				if (pli.FindFile(selected_path)) {
+					selected_idx = idx;
+					break;
+				}
+				curPlayList.GetNext(pos);
+				idx++;
+			}
+		}
 	}
 
 	if (bIsEmpty && selected_idx >= 0 && selected_idx < curPlayList.GetCount()) {
