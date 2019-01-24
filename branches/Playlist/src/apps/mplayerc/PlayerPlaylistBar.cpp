@@ -2660,6 +2660,7 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 			}
 		}
 	}
+	m_list.SetFocus();
 }
 
 void CPlayerPlaylistBar::OnLButtonUp(UINT nFlags, CPoint point)
@@ -2894,27 +2895,31 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 
 	const bool bExplorer = TGetPlaylistType() == EXPLORER;
 	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_OPEN, ResStr(IDS_PLAYLIST_OPEN) + L"\tSpace");
-	m.AppendMenu(MF_STRING | (!bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_ADD, ResStr(IDS_PLAYLIST_ADD));
-	m.AppendMenu(MF_STRING | (bOnItem && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_REMOVE, ResStr(IDS_PLAYLIST_REMOVE) + L"\tDelete");
-	m.AppendMenu(MF_SEPARATOR);
-	m.AppendMenu(MF_STRING | (bOnItem && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_DELETE, ResStr(IDS_PLAYLIST_DELETE) + L"\tShift+Delete");
-	m.AppendMenu(MF_SEPARATOR);
-	m.AppendMenu(MF_STRING | (curPlayList.GetCount() && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLEAR, ResStr(IDS_PLAYLIST_CLEAR));
-	m.AppendMenu(MF_SEPARATOR);
+	if (!bExplorer) {
+		m.AppendMenu(MF_STRING | MF_ENABLED, M_ADD, ResStr(IDS_PLAYLIST_ADD));
+		m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_REMOVE, ResStr(IDS_PLAYLIST_REMOVE) + L"\tDelete");
+		m.AppendMenu(MF_SEPARATOR);
+		m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_DELETE, ResStr(IDS_PLAYLIST_DELETE) + L"\tShift+Delete");
+		m.AppendMenu(MF_SEPARATOR);
+		m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLEAR, ResStr(IDS_PLAYLIST_CLEAR));
+		m.AppendMenu(MF_SEPARATOR);
+	}
 	m.AppendMenu(MF_STRING | (bOnItem ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_CLIPBOARD, ResStr(IDS_PLAYLIST_COPYTOCLIPBOARD));
-	m.AppendMenu(MF_STRING | (curPlayList.GetCount() && !bExplorer ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SAVEAS, ResStr(IDS_PLAYLIST_SAVEAS));
-	m.AppendMenu(MF_SEPARATOR);
-	CMenu submenu2;
-	submenu2.CreatePopupMenu();
-	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYNAME, ResStr(IDS_PLAYLIST_SORTBYLABEL));
-	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYPATH, ResStr(IDS_PLAYLIST_SORTBYPATH));
-	submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTREVERSE, ResStr(IDS_PLAYLIST_SORTREVERSE));
-	m.AppendMenu(MF_STRING | MF_POPUP | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), (UINT_PTR)submenu2.Detach(), ResStr(IDS_PLAYLIST_SORT));
-	m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_RANDOMIZE, ResStr(IDS_PLAYLIST_RANDOMIZE));
-	m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SORTBYID, ResStr(IDS_PLAYLIST_RESTORE));
-	m.AppendMenu(MF_SEPARATOR);
-	m.AppendMenu(MF_STRING | MF_ENABLED | (s.bShufflePlaylistItems ? MF_CHECKED : MF_UNCHECKED), M_SHUFFLE, ResStr(IDS_PLAYLIST_SHUFFLE));
-	m.AppendMenu(MF_SEPARATOR);
+	if (!bExplorer) {
+		m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SAVEAS, ResStr(IDS_PLAYLIST_SAVEAS));
+		m.AppendMenu(MF_SEPARATOR);
+		CMenu submenu2;
+		submenu2.CreatePopupMenu();
+		submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYNAME, ResStr(IDS_PLAYLIST_SORTBYLABEL));
+		submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTBYPATH, ResStr(IDS_PLAYLIST_SORTBYPATH));
+		submenu2.AppendMenu(MF_STRING | MF_ENABLED, M_SORTREVERSE, ResStr(IDS_PLAYLIST_SORTREVERSE));
+		m.AppendMenu(MF_STRING | MF_POPUP | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), (UINT_PTR)submenu2.Detach(), ResStr(IDS_PLAYLIST_SORT));
+		m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_RANDOMIZE, ResStr(IDS_PLAYLIST_RANDOMIZE));
+		m.AppendMenu(MF_STRING | (curPlayList.GetCount() ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_SORTBYID, ResStr(IDS_PLAYLIST_RESTORE));
+		m.AppendMenu(MF_SEPARATOR);
+		m.AppendMenu(MF_STRING | MF_ENABLED | (s.bShufflePlaylistItems ? MF_CHECKED : MF_UNCHECKED), M_SHUFFLE, ResStr(IDS_PLAYLIST_SHUFFLE));
+		m.AppendMenu(MF_SEPARATOR);
+	}
 	m.AppendMenu(MF_STRING | (bOnItem && bMIEnable ? MF_ENABLED : (MF_DISABLED | MF_GRAYED)), M_MEDIAINFO, L"MediaInfo");
 	m.AppendMenu(MF_SEPARATOR);
 	m.AppendMenu(MF_STRING | MF_ENABLED | (s.bHidePlaylistFullScreen ? MF_CHECKED : MF_UNCHECKED), M_HIDEFULLSCREEN, ResStr(IDS_PLAYLIST_HIDEFS));
@@ -2997,30 +3002,45 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 			}
 			break;
 		case M_SORTBYID:
+			if (bExplorer) {
+				return;
+			}
 			curPlayList.SortById();
 			SetupList();
 			SavePlaylist();
 			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTBYNAME:
+			if (bExplorer) {
+				return;
+			}
 			curPlayList.SortByName();
 			SetupList();
 			SavePlaylist();
 			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTBYPATH:
+			if (bExplorer) {
+				return;
+			}
 			curPlayList.SortByPath();
 			SetupList();
 			SavePlaylist();
 			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_SORTREVERSE:
+			if (bExplorer) {
+				return;
+			}
 			curPlayList.ReverseSort();
 			SetupList();
 			SavePlaylist();
 			EnsureVisible(curPlayList.GetPos(), true);
 			break;
 		case M_RANDOMIZE:
+			if (bExplorer) {
+				return;
+			}
 			Randomize();
 			break;
 		case M_CLIPBOARD:
@@ -3054,6 +3074,9 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 			}
 			break;
 		case M_SAVEAS: {
+			if (bExplorer) {
+				return;
+			}
 			CSaveTextFileDialog fd(
 				CTextFile::UTF8, nullptr, nullptr,
 				L"MPC-BE playlist (*.mpcpl)|*.mpcpl|Playlist (*.pls)|*.pls|Winamp playlist (*.m3u)|*.m3u|Windows Media playlist (*.asx)|*.asx||",
@@ -3200,6 +3223,9 @@ void CPlayerPlaylistBar::OnContextMenu(CWnd* /*pWnd*/, CPoint p)
 		}
 		break;
 		case M_SHUFFLE:
+			if (bExplorer) {
+				return;
+			}
 			s.bShufflePlaylistItems = !s.bShufflePlaylistItems;
 			break;
 		case M_MEDIAINFO:
@@ -3678,7 +3704,9 @@ void CPlayerPlaylistBar::TSelectTab()
 		}
 	}
 	TCalcLayout();
+	EnsureVisible(curPlayList.GetPos());
 	TDrawBar();
+	//m_list.SetFocus();
 }
 
 void CPlayerPlaylistBar::TParseFolder(const CString& path)
