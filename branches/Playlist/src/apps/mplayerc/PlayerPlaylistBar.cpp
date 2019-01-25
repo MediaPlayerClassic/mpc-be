@@ -1669,12 +1669,15 @@ void CPlayerPlaylistBar::Open(CString fn)
 
 void CPlayerPlaylistBar::Open(std::list<CString>& fns, bool fMulti, CSubtitleItemList* subs/* = nullptr*/, bool bCheck/* = true*/)
 {
-	ResolveLinkFiles(fns);
+	curPlayList.m_nFocused_idx = TGetFocusedElement();
 	m_nCurPlayListIndex = 0;
-	TSaveSettings();
-	TDrawBar();
+
 	Empty();
+	ResolveLinkFiles(fns);
 	Append(fns, fMulti, subs, bCheck);
+
+	TEnsureVisible(m_nCurPlayListIndex);
+	TSelectTab();
 }
 
 void CPlayerPlaylistBar::Append(CString fn)
