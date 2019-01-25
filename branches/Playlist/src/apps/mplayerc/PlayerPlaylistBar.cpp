@@ -1860,7 +1860,7 @@ int CPlayerPlaylistBar::FindItem(POSITION pos)
 
 POSITION CPlayerPlaylistBar::FindPos(int i)
 {
-	return i < 0 ? nullptr : (POSITION)m_list.GetItemData(i);
+	return (i < 0 || i >= m_list.GetItemCount()) ? nullptr : (POSITION)m_list.GetItemData(i);
 }
 
 int CPlayerPlaylistBar::GetCount()
@@ -2150,7 +2150,7 @@ void CPlayerPlaylistBar::SavePlaylist()
 				::CreateDirectoryW(base, nullptr);
 			}
 
-			SaveMPCPlayList(file, CTextFile::UTF8, false, m_tabs[m_nCurPlayListIndex].name);
+			SaveMPCPlayList(file, CTextFile::UTF8, false, m_nCurPlayListIndex > 0 ? m_tabs[m_nCurPlayListIndex].name : L"");
 		} else if (::PathFileExistsW(file)) {
 			::DeleteFileW(file);
 		}
@@ -3306,11 +3306,6 @@ void CPlayerPlaylistBar::OnSetFocus(CWnd* pOldWnd)
 	}
 }
 
-CString CPlayerPlaylistBar::TGetTabName(const size_t idx) const
-{
-	return idx == 0 ? ResStr(IDF_LOGO1) : m_tabs[idx].name;
-}
-
 void CPlayerPlaylistBar::TCalcLayout()
 {
 	CClientDC dc(this);
@@ -3345,8 +3340,7 @@ void CPlayerPlaylistBar::TCalcLayout()
 	m_tabs[m_tabs.size() - 1].bVisible = false;
 
 	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
-		const CString name = TGetTabName(i);
-		wTsSize += mdc.GetTextExtent(name).cx + WIDTH_TABBUTTON;
+		wTsSize += mdc.GetTextExtent(m_tabs[i].name).cx + WIDTH_TABBUTTON;
 	}
 	m_tabs[m_tabs.size() - 3].r = rcTabBar;
 	m_tabs[m_tabs.size() - 3].r.left = rcTabBar.right - wSysButton;
@@ -3371,16 +3365,17 @@ void CPlayerPlaylistBar::TCalcLayout()
 	}
 
 	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
-		m_tabs[i].r = rcTabBar;
-		const CString name = TGetTabName(i);
-		int wTab = mdc.GetTextExtent(name).cx + WIDTH_TABBUTTON;
+		auto& tab = m_tabs[i];
+
+		tab.r = rcTabBar;
+		int wTab = mdc.GetTextExtent(tab.name).cx + WIDTH_TABBUTTON;
 		if (i == 0) {
-			m_tabs[i].r.left = rcTPage.left - TGetOffset();
-			m_tabs[i].r.right = m_tabs[i].r.left + wTab;
+			tab.r.left = rcTPage.left - TGetOffset();
+			tab.r.right = tab.r.left + wTab;
 		}
 		else {
-			m_tabs[i].r.left = m_tabs[i - 1].r.right;
-			m_tabs[i].r.right = m_tabs[i].r.left + wTab;
+			tab.r.left = m_tabs[i - 1].r.right;
+			tab.r.right = tab.r.left + wTab;
 		}
 	}
 
@@ -3439,18 +3434,19 @@ void CPlayerPlaylistBar::TDrawBar()
 		mdc.FillSolidRect(rcTabBar, m_crBkBar);
 
 		for (size_t i = m_tabs.size() - 3; i < m_tabs.size(); i++) {
-			if (m_tabs[i].bVisible) {
+			auto& tab = m_tabs[i];
+			if (tab.bVisible) {
 				// Buttons
-				mdc.Draw3dRect(m_tabs[i].r, m_crBNL, m_crBND);
+				mdc.Draw3dRect(tab.r, m_crBNL, m_crBND);
 				mdc.SetTextColor(m_crTN);
-				mdc.DrawText(m_tabs[i].name, m_tabs[i].name.GetLength(), &m_tabs[i].r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				mdc.DrawText(tab.name, tab.name.GetLength(), &tab.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 				// Highlighted Buttons
 				if (i == m_button_idx && m_button_idx != m_nCurPlayListIndex) {
 					mdc.SetTextColor(m_crTH);
-					mdc.FillSolidRect(m_tabs[i].r, m_crBH);
-					mdc.Draw3dRect(m_tabs[i].r, m_crBHL, m_crBHD);
-					mdc.DrawText(m_tabs[i].name, m_tabs[i].name.GetLength(), &m_tabs[i].r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+					mdc.FillSolidRect(tab.r, m_crBH);
+					mdc.Draw3dRect(tab.r, m_crBHL, m_crBHD);
+					mdc.DrawText(tab.name, tab.name.GetLength(), &tab.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				}
 			}
 		}
@@ -3460,34 +3456,33 @@ void CPlayerPlaylistBar::TDrawBar()
 		HRGN hRgnExclude = ::CreateRectRgnIndirect(&rcTPage);
 		SelectClipRgn(mdc, hRgnExclude);
 		for (size_t i = 0; i < m_tabs.size() - 3; i++) {
-			CRect rcText = m_tabs[i].r;
+			auto& tab = m_tabs[i];
+			CRect rcText = tab.r;
 			rcText.DeflateRect(2, 2, 2, 2);
 			// tab
-			if (m_tabs[i].bVisible) {
-				const CString name = TGetTabName(i);
-
+			if (tab.bVisible) {
 				mdc.SetTextColor(m_crTN);
-				mdc.DrawText(name.GetString(), name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				// higjlighted tab
 				if (i == m_button_idx && m_button_idx != m_nCurPlayListIndex) {
 					mdc.SetTextColor(m_crTH);
-					mdc.FillSolidRect(m_tabs[i].r, m_crBH);
-					mdc.Draw3dRect(m_tabs[i].r, m_crBHL, m_crBHL);
-					mdc.DrawText(name.GetString(), name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+					mdc.FillSolidRect(tab.r, m_crBH);
+					mdc.Draw3dRect(tab.r, m_crBHL, m_crBHL);
+					mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				}
 				// current activetab
 				if (i == m_nCurPlayListIndex) {
 					if (i == m_button_idx) { // selected and highlighted
 						mdc.SetTextColor(m_crTS);
-						mdc.FillSolidRect(m_tabs[i].r, m_crBSH);
-						mdc.Draw3dRect(m_tabs[i].r, m_crBSHL, m_crBSHL);
-						mdc.DrawText(name.GetString(), name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+						mdc.FillSolidRect(tab.r, m_crBSH);
+						mdc.Draw3dRect(tab.r, m_crBSHL, m_crBSHL);
+						mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 					}
 					else { // selected
-						mdc.FillSolidRect(m_tabs[i].r, m_crBS);
+						mdc.FillSolidRect(tab.r, m_crBS);
 						mdc.SetTextColor(m_crTS);
-						mdc.Draw3dRect(m_tabs[i].r, m_crBSL, m_crBSL);
-						mdc.DrawText(name.GetString(), name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+						mdc.Draw3dRect(tab.r, m_crBSL, m_crBSL);
+						mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 					}
 
 				}
@@ -3529,9 +3524,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 		if (i == m_nCurPlayListIndex) {
 			flags |= MF_CHECKED | MFT_RADIOCHECK;
 		}
-
-		const CString name = TGetTabName(i);
-		menu.AppendMenuW(flags, id++, name);
+		menu.AppendMenuW(flags, id++, m_tabs[i].name);
 	}
 	menu.AppendMenuW(MF_SEPARATOR);
 
@@ -3908,7 +3901,7 @@ void CPlayerPlaylistBar::TGetSettings()
 
 		tab tpl;
 		tpl.type = _wtoi(arFields[0]);
-		tpl.name = arFields[1];
+		tpl.name = m_pls.empty() ? ResStr(IDF_LOGO1) : arFields[1];
 		tpl.fn = arFields[1] + (L".mpcpl");
 		tpl.bVisible = _wtoi(arFields[2]);
 		m_tabs.push_back(tpl);
@@ -3922,7 +3915,7 @@ void CPlayerPlaylistBar::TGetSettings()
 		for (int i = 0; i < 2; i++) {
 			tab tpl;
 			tpl.type = i == 0 ? PLAYLIST : EXPLORER;
-			tpl.name = i == 0 ? L"Default" : ResStr(IDS_PLAYLIST_EXPLORER_NAME);
+			tpl.name = i == 0 ? ResStr(IDF_LOGO1) : ResStr(IDS_PLAYLIST_EXPLORER_NAME);
 			tpl.fn   = i == 0 ? L"Default.mpcpl" : L"Explorer.mpcpl";
 
 			// add playlist
@@ -3940,6 +3933,10 @@ void CPlayerPlaylistBar::TGetSettings()
 		tpl.name = i == 0 ? L"::" : i == 1 ? L">" : L"<";
 		tpl.bVisible = i == 0 ? true : false;
 		m_tabs.push_back(tpl);
+	}
+
+	if (cntOffset >= (m_tabs.size() - 3)) {
+		cntOffset = 0;
 	}
 
 	if (m_nCurPlayListIndex > m_tabs.size() - 3) {
@@ -4098,8 +4095,7 @@ int CPlayerPlaylistBar::TGetOffset()
 	mdc.SelectObject(&font);
 	int widthOffset = 0;
 	for (size_t i = 0; i < cntOffset; i++) {
-		const CString name = TGetTabName(i);
-		widthOffset += mdc.GetTextExtent(name).cx + WIDTH_TABBUTTON;
+		widthOffset += mdc.GetTextExtent(m_tabs[i].name).cx + WIDTH_TABBUTTON;
 	}
 
 	mdc.DeleteDC();

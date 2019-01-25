@@ -248,7 +248,6 @@ private:
 	std::map<CString, HICON> m_icons_large;
 
 	void TDrawBar();
-	CString TGetTabName(const size_t idx) const;
 	void TCalcLayout();
 	void TIndexHighighted();
 	void TTokenizer(const CString& strFields, LPCWSTR strDelimiters, std::vector<CString>& arFields);
