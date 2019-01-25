@@ -3699,9 +3699,6 @@ void CPlayerPlaylistBar::TDeleteAllPlaylists()
 {
 	m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
 	
-	m_nCurPlayListIndex = 0; // otherwise, the selected
-	SavePlaylist(); //  tab will not be removed
-
 	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
 		CString base;
 		if (AfxGetMyApp()->GetAppSavePath(base)) {
@@ -3712,6 +3709,18 @@ void CPlayerPlaylistBar::TDeleteAllPlaylists()
 			}
 		}
 	}
+}
+
+void CPlayerPlaylistBar::TSaveAllPlaylists()
+{
+	const auto nCurPlayListIndex = m_nCurPlayListIndex;
+
+	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+		m_nCurPlayListIndex = i;
+		SavePlaylist();
+	}
+
+	m_nCurPlayListIndex = nCurPlayListIndex;
 }
 
 void CPlayerPlaylistBar::TSelectTab()

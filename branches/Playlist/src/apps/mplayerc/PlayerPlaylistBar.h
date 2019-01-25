@@ -319,6 +319,7 @@ public:
 
 	void TSetColor();
 	void TDeleteAllPlaylists();
+	void TSaveAllPlaylists();
 
 	int GetCount();
 	int GetSelIdx();

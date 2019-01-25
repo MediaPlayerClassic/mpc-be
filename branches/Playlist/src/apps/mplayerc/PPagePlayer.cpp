@@ -240,7 +240,9 @@ BOOL CPPagePlayer::OnApply()
 
 	// Check if the settings location needs to be changed
 	if (AfxGetProfile().IsIniValid() != !!m_bUseIni) {
+		pFrame->m_wndPlaylistBar.TDeleteAllPlaylists();
 		AfxGetMyApp()->ChangeSettingsLocation(!!m_bUseIni);
+		pFrame->m_wndPlaylistBar.TSaveAllPlaylists();
 	}
 
 	AfxGetMainFrame()->ShowTrayIcon(s.bTrayIcon);
