@@ -2107,7 +2107,9 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 		curPlayList.m_nSelected_idx = INT_MAX;
 	}
 	else {
-		SelectFileInPlaylist(filename);
+		if (!SelectFileInPlaylist(filename)) {
+			EnsureVisible(FindPos(0));
+		}
 	}
 
 	TDrawBar();
@@ -3560,14 +3562,15 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 						}
 					}
 
-					strDefName.Format(L"Playlist %u", cnt); // default value for CEdit dlg
+					strDefName.Format(ResStr(IDS_PLAYLIST_NAME_FORMAT), cnt);
 					CPlaylistNameDlg dlg(strDefName);
 					if (dlg.DoModal() != IDOK) {
 						return;
 					}
 					strGetName = dlg.m_name;
-					if (strGetName.IsEmpty()) 
+					if (strGetName.IsEmpty()) {
 						return;
+					}
 
 					tab tpl;
 					tpl.type = PLAYLIST;
@@ -3593,7 +3596,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 							cnt++;
 						}
 					}
-					strDefName.Format(L"Explorer %d", cnt);// default value for CEdit dlg
+					strDefName.Format(ResStr(IDS_PLAYLIST_EXPLORER_NAME_FORMAT), cnt);
 					CPlaylistNameDlg dlg(strDefName);
 					if (dlg.DoModal() != IDOK) {
 						return;
@@ -3719,16 +3722,6 @@ void CPlayerPlaylistBar::TSelectTab()
 	if (curPlayList.m_nSelected_idx != INT_MAX) {
 		SetSelIdx(curPlayList.m_nSelected_idx + 1, true);
 		curPlayList.m_nSelected_idx = INT_MAX;
-	}
-	else {
-		CString base;
-		if (AfxGetMyApp()->GetAppSavePath(base)) {
-			base.Append(m_tabs[m_nCurPlayListIndex].fn);
-
-			if (::PathFileExistsW(base)) {
-				SelectFileInPlaylist(base);
-			}
-		}
 	}
 
 	TCalcLayout();
@@ -4218,5 +4211,5 @@ int CPlayerPlaylistBar::TGetFocusedElement() const
 		}
 	}
 
-	return -1;
+	return 0;
 }
