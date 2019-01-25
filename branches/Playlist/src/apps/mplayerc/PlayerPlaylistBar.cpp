@@ -1167,7 +1167,8 @@ void CPlayerPlaylistBar::ParsePlayList(std::list<CString>& fns, CSubtitleItemLis
 			curPlayList.GetTail().m_label = label;
 			return;
 		} else if (ct == L"application/x-mpc-playlist") {
-			ParseMPCPlayList(fn);
+			CString name;
+			ParseMPCPlayList(fn, name);
 			return;
 		} else if (ct == L"audio/x-mpegurl" || ct == L"application/http-live-streaming-m3u") {
 			ParseM3UPlayList(fn);
@@ -1209,9 +1210,8 @@ static CString CombinePath(CPath p, CString fn)
 	return out;
 }
 
-bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
+bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn, CString& name)
 {
-
 	CString str;
 	std::map<int, CPlaylistItem> pli;
 	std::vector<int> idx;
@@ -1229,6 +1229,12 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 	base.RemoveFileSpec();
 
 	while (f.ReadString(str)) {
+		if (name.IsEmpty() && str.Left(5).MakeLower() == L"name,") {
+			str.Delete(0, 5);
+			name = str;
+			continue;
+		}
+
 		std::list<CString> sl;
 		Explode(str, sl, L',', 3);
 		if (sl.size() != 3) {
@@ -1344,7 +1350,7 @@ bool CPlayerPlaylistBar::ParseMPCPlayList(CString fn)
 	return pli.size() > 0;
 }
 
-bool CPlayerPlaylistBar::SaveMPCPlayList(CString fn, CTextFile::enc e, bool fRemovePath)
+bool CPlayerPlaylistBar::SaveMPCPlayList(CString fn, CTextFile::enc e, bool fRemovePath, const CString name/* = L""*/)
 {
 	CTextFile f;
 	if (!f.Save(fn, e)) {
@@ -1352,6 +1358,11 @@ bool CPlayerPlaylistBar::SaveMPCPlayList(CString fn, CTextFile::enc e, bool fRem
 	}
 
 	f.WriteString(L"MPCPLAYLIST\n");
+
+	if (!name.IsEmpty()) {
+		CString str; str.Format(L"name,%s\n", name);
+		f.WriteString(str);
+	}
 
 	POSITION cur_pos = curPlayList.GetPos();
 
@@ -2080,8 +2091,9 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 {
 	int curpl = m_nCurPlayListIndex;
 	for (size_t i = 0; i < m_tabs.size(); i++) {
-		if (m_tabs[i].type == BUTTON) 
+		if (m_tabs[i].type == BUTTON) {
 			continue;
+		}
 		m_nCurPlayListIndex = i;
 		CString base;
 		if (AfxGetMyApp()->GetAppSavePath(base)) {
@@ -2089,7 +2101,11 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 
 			if (::PathFileExistsW(base)) {
 				if (AfxGetAppSettings().bRememberPlaylistItems) {
-					ParseMPCPlayList(base);
+					CString name;
+					ParseMPCPlayList(base, name);
+					if (!name.IsEmpty()) {
+						m_tabs[i].name = name;
+					}
 				}
 				else {
 					::DeleteFileW(base);
@@ -2125,7 +2141,6 @@ void CPlayerPlaylistBar::SavePlaylist()
 	}
 
 	CString base;
-
 	if (AfxGetMyApp()->GetAppSavePath(base)) {
 		CString file = base + m_tabs[m_nCurPlayListIndex].fn;
 
@@ -2135,7 +2150,7 @@ void CPlayerPlaylistBar::SavePlaylist()
 				::CreateDirectoryW(base, nullptr);
 			}
 
-			SaveMPCPlayList(file, CTextFile::UTF8, false);
+			SaveMPCPlayList(file, CTextFile::UTF8, false, m_tabs[m_nCurPlayListIndex].name);
 		} else if (::PathFileExistsW(file)) {
 			::DeleteFileW(file);
 		}
@@ -3565,7 +3580,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 						}
 					}
 
-					strDefName.Format(ResStr(IDS_PLAYLIST_NAME_FORMAT), cnt);
+					strDefName.Format(L"%s %u", ResStr(IDS_PLAYLIST_NAME), cnt);
 					CPlaylistNameDlg dlg(strDefName);
 					if (dlg.DoModal() != IDOK) {
 						return;
@@ -3578,7 +3593,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					tab tpl;
 					tpl.type = PLAYLIST;
 					tpl.name = strGetName;
-					tpl.fn.Format(L"%s.mpcpl", strGetName);
+					tpl.fn.Format(L"Playlist%u.mpcpl", cnt);
 					m_tabs.insert(m_tabs.begin() + m_nCurPlayListIndex + 1, tpl);
 
 					CPlaylist* pl = DNew CPlaylist;
@@ -3599,7 +3614,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 							cnt++;
 						}
 					}
-					strDefName.Format(ResStr(IDS_PLAYLIST_EXPLORER_NAME_FORMAT), cnt);
+					strDefName.Format(L"%s %u", ResStr(IDS_PLAYLIST_EXPLORER_NAME), cnt);
 					CPlaylistNameDlg dlg(strDefName);
 					if (dlg.DoModal() != IDOK) {
 						return;
@@ -3612,7 +3627,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					tab t;
 					t.type = EXPLORER;
 					t.name = strGetName;
-					t.fn.Format(L"%s.mpcpl", strGetName);
+					t.fn.Format(L"Explorer%u.mpcpl", cnt);
 					m_tabs.insert(m_tabs.begin() + m_nCurPlayListIndex + 1, t);
 
 					CPlaylist* pl = DNew CPlaylist;
@@ -3639,19 +3654,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					if (strGetName.IsEmpty()) {
 						return;
 					}
-					CString oldfn = m_tabs[m_nCurPlayListIndex].fn;
 					m_tabs[m_nCurPlayListIndex].name = strGetName;
-					m_tabs[m_nCurPlayListIndex].fn.Format(L"%s.mpcpl", strGetName);
-
-					CString base;
-					if (AfxGetMyApp()->GetAppSavePath(base)) {
-						CString newfn = base + m_tabs[m_nCurPlayListIndex].fn;
-						oldfn = base + oldfn;
-
-						if (::PathFileExistsW(base)) {
-							::MoveFileW(oldfn, newfn);
-						}
-					}
+					SavePlaylist();
 				}
 				break;
 			case 4: // DELETE TAB
@@ -3875,7 +3879,7 @@ void CPlayerPlaylistBar::TSaveSettings()
 		const auto last = m_tabs.size() - 3 - 1;
 		for (size_t i = 0; i <= last; i++) {
 			CString s;
-			str.AppendFormat(L"%d;%s;%d;%s", m_tabs[i].type, m_tabs[i].name, m_tabs[i].bVisible ? 1 : 0, i < last ? L"|" : L"");
+			str.AppendFormat(L"%d;%s;%d;%s", m_tabs[i].type, RemoveFileExt(m_tabs[i].fn.GetString()), m_tabs[i].bVisible ? 1 : 0, i < last ? L"|" : L"");
 		}
 	}
 
@@ -3918,8 +3922,8 @@ void CPlayerPlaylistBar::TGetSettings()
 		for (int i = 0; i < 2; i++) {
 			tab tpl;
 			tpl.type = i == 0 ? PLAYLIST : EXPLORER;
-			tpl.name = i == 0 ? L"Default" : L"EXPLORER";
-			tpl.fn = tpl.name + L".mpcpl";
+			tpl.name = i == 0 ? L"Default" : ResStr(IDS_PLAYLIST_EXPLORER_NAME);
+			tpl.fn   = i == 0 ? L"Default.mpcpl" : L"Explorer.mpcpl";
 
 			// add playlist
 			CPlaylist* pl = DNew CPlaylist;
