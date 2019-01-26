@@ -3597,6 +3597,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					SavePlaylist(); //save new playlist
 
 					TSelectTab();
+					TEnsureVisible(m_nCurPlayListIndex);
+					TCalcLayout();
 				}
 				break;
 			case 2: // ADD EXPLORER TAB
@@ -3631,6 +3633,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					SavePlaylist(); //save new playlist
 
 					TSelectTab();
+					TEnsureVisible(m_nCurPlayListIndex);
+					TCalcLayout();
 					TParseFolder(L".\\");
 
 					bNewExplorer = true;
@@ -3675,6 +3679,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					}
 
 					TSelectTab();
+					TEnsureVisible(m_nCurPlayListIndex);
+					TCalcLayout();
 				}
 				break;
 			case 0:
@@ -3800,8 +3806,7 @@ void CPlayerPlaylistBar::TParseFolder(const CString& path)
 			const CString fileName = FindFileData.cFileName;
 
 			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-				if (fileName != L"." && fileName != L".." && fileName != L"System Volume Information"
-						&& fileName != L"$RECYCLE.BIN" && fileName != L"$Recycle.Bin") {
+				if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) && fileName != L"." && fileName != L"..") {
 					CPlaylistItem pli;
 					pli.m_fns.push_front(path + fileName + L">"); // Folders mark
 					curPlayList.AddTail(pli);
