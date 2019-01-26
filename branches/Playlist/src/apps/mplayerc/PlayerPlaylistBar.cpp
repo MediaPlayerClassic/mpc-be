@@ -2668,12 +2668,12 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 		TOnMenu();
 		return;
 	}
-	else if (m_tabs[m_tabs.size() - 2].r.PtInRect(point)) {
+	else if (m_tabs[m_tabs.size() - 2].bVisible && m_tabs[m_tabs.size() - 2].r.PtInRect(point)) {
 		TSetOffset();
 		TCalcLayout();
 		TDrawBar();
 	}
-	else if (m_tabs[m_tabs.size() - 1].r.PtInRect(point)) {
+	else if (m_tabs[m_tabs.size() - 1].bVisible && m_tabs[m_tabs.size() - 1].r.PtInRect(point)) {
 		TSetOffset(true);
 		TCalcLayout();
 		TDrawBar();
