@@ -3908,7 +3908,7 @@ void CPlayerPlaylistBar::TGetSettings()
 
 		tab tpl;
 		tpl.type = _wtoi(arFields[0]);
-		tpl.name = m_pls.empty() ? ResStr(IDF_LOGO1) : arFields[1];
+		tpl.name = m_pls.empty() ? ResStr(IDS_PLAYLIST_MAIN_NAME) : arFields[1];
 		tpl.fn = arFields[1] + (L".mpcpl");
 		m_tabs.push_back(tpl);
 
@@ -3921,7 +3921,7 @@ void CPlayerPlaylistBar::TGetSettings()
 		for (int i = 0; i < 2; i++) {
 			tab tpl;
 			tpl.type = i == 0 ? PLAYLIST : EXPLORER;
-			tpl.name = i == 0 ? ResStr(IDF_LOGO1) : ResStr(IDS_PLAYLIST_EXPLORER_NAME);
+			tpl.name = i == 0 ? ResStr(IDS_PLAYLIST_MAIN_NAME) : ResStr(IDS_PLAYLIST_EXPLORER_NAME);
 			tpl.fn   = i == 0 ? L"Default.mpcpl" : L"Explorer.mpcpl";
 
 			// add playlist

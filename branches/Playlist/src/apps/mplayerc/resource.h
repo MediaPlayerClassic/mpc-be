@@ -901,6 +901,7 @@
 #define IDS_PLAYLIST_DELETE_CURRENT     14208
 #define IDS_PLAYLIST_NAME               14209
 #define IDS_PLAYLIST_EXPLORER_NAME      14210
+#define IDS_PLAYLIST_MAIN_NAME          14211
 
 #define IDS_AG_RESET_STATS              20005
 #define IDS_VIEW_BORDERLESS             20007
