@@ -218,6 +218,7 @@ private:
 
 	bool m_bSingleElement = false;
 
+	int m_tab_idx = -1;
 	int m_button_idx = -1;
 
 #define WIDTH_TABBUTTON 20
@@ -240,9 +241,24 @@ private:
 		CString name;         // playlist label
 		CString fn;           // file playlist name
 		CRect r;              // layout
-		bool bVisible = true;
 	};
 	std::vector<tab> m_tabs;
+
+	enum {
+		LEFT,
+		RIGHT,
+		MENU
+	};
+	struct tab_button {
+		CString name;
+		CRect r;
+		bool bVisible = false;
+	};
+	tab_button m_tab_buttons[3] = {
+		{L"<"},
+		{L">"},
+		{L"::", CRect(), true}
+	};
 
 	std::map<CString, HICON> m_icons;
 	std::map<CString, HICON> m_icons_large;

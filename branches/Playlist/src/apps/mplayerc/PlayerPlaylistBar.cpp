@@ -2091,9 +2091,6 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 {
 	int curpl = m_nCurPlayListIndex;
 	for (size_t i = 0; i < m_tabs.size(); i++) {
-		if (m_tabs[i].type == BUTTON) {
-			continue;
-		}
 		m_nCurPlayListIndex = i;
 		CString base;
 		if (AfxGetMyApp()->GetAppSavePath(base)) {
@@ -2136,10 +2133,6 @@ void CPlayerPlaylistBar::LoadPlaylist(CString filename)
 
 void CPlayerPlaylistBar::SavePlaylist()
 {
-	if (m_tabs[m_nCurPlayListIndex].type == BUTTON) {
-		return;
-	}
-
 	CString base;
 	if (AfxGetMyApp()->GetAppSavePath(base)) {
 		CString file = base + m_tabs[m_nCurPlayListIndex].fn;
@@ -2315,6 +2308,7 @@ void CPlayerPlaylistBar::OnNMDblclkList(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CPlayerPlaylistBar::OnMouseLeave()
 {
+	m_tab_idx = -1;
 	m_button_idx = -1;
 	TDrawBar();
 }
@@ -2519,7 +2513,10 @@ BOOL CPlayerPlaylistBar::OnPlayPlay(UINT nID)
 
 void CPlayerPlaylistBar::DropFiles(std::list<CString>& slFiles)
 {
-	if (TGetPlaylistType() == EXPLORER) return;
+	if (TGetPlaylistType() == EXPLORER) {
+		return;
+	}
+
 	SetForegroundWindow();
 	m_list.SetFocus();
 
@@ -2530,7 +2527,9 @@ void CPlayerPlaylistBar::DropFiles(std::list<CString>& slFiles)
 
 void CPlayerPlaylistBar::OnBeginDrag(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	if (TGetPlaylistType() == EXPLORER) return;
+	if (TGetPlaylistType() == EXPLORER) {
+		return;
+	}
 	
 	ModifyStyle(WS_EX_ACCEPTFILES, 0);
 
@@ -2643,20 +2642,16 @@ void CPlayerPlaylistBar::OnTimer(UINT_PTR nIDEvent)
 
 void CPlayerPlaylistBar::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
-
 	CRect rcBar;
 	GetClientRect(&rcBar);
 
 	if (!rcBar.PtInRect(point)) {
 		__super::OnLButtonDblClk(nFlags, point);
-
 	}
 }
 
-
 void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	
 	CRect rcBar;
 	GetClientRect(&rcBar);
 
@@ -2664,22 +2659,22 @@ void CPlayerPlaylistBar::OnLButtonDown(UINT nFlags, CPoint point)
 		__super::OnLButtonDown(nFlags, point);
 	}
 
-	if (m_tabs[m_tabs.size() - 3].r.PtInRect(point)) {
+	if (m_tab_buttons[MENU].r.PtInRect(point)) {
 		TOnMenu();
 		return;
 	}
-	else if (m_tabs[m_tabs.size() - 2].bVisible && m_tabs[m_tabs.size() - 2].r.PtInRect(point)) {
+	else if (m_tab_buttons[RIGHT].bVisible && m_tab_buttons[RIGHT].r.PtInRect(point)) {
 		TSetOffset();
 		TCalcLayout();
 		TDrawBar();
 	}
-	else if (m_tabs[m_tabs.size() - 1].bVisible && m_tabs[m_tabs.size() - 1].r.PtInRect(point)) {
+	else if (m_tab_buttons[LEFT].bVisible && m_tab_buttons[LEFT].r.PtInRect(point)) {
 		TSetOffset(true);
 		TCalcLayout();
 		TDrawBar();
 	}
 	else {
-		for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+		for (size_t i = 0; i < m_tabs.size(); i++) {
 			if (m_tabs[i].r.PtInRect(point)) {
 				//SavePlaylist();
 				curPlayList.m_nFocused_idx = TGetFocusedElement();
@@ -3336,35 +3331,35 @@ void CPlayerPlaylistBar::TCalcLayout()
 	rcTPage = rcTabBar;
 	rcTPage.right = rcTabBar.right - wSysButton;
 
-	m_tabs[m_tabs.size() - 2].bVisible = false;
-	m_tabs[m_tabs.size() - 1].bVisible = false;
+	m_tab_buttons[RIGHT].bVisible = false;
+	m_tab_buttons[LEFT].bVisible = false;
 
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		wTsSize += mdc.GetTextExtent(m_tabs[i].name).cx + WIDTH_TABBUTTON;
 	}
-	m_tabs[m_tabs.size() - 3].r = rcTabBar;
-	m_tabs[m_tabs.size() - 3].r.left = rcTabBar.right - wSysButton;
-	m_tabs[m_tabs.size() - 3].r.right = m_tabs[m_tabs.size() - 3].r.left + wSysButton;
+	m_tab_buttons[MENU].r = rcTabBar;
+	m_tab_buttons[MENU].r.left = rcTabBar.right - wSysButton;
+	m_tab_buttons[MENU].r.right = m_tab_buttons[MENU].r.left + wSysButton;
 
 
 	if (wTsSize > rcTabBar.right - wSysButton || cntOffset > 0) {
 		rcTPage.left = rcTabBar.left + wSysButton;
 		rcTPage.right = rcTabBar.right - wSysButton * 2 - 3;
-		m_tabs[m_tabs.size() - 1].r = rcTabBar;
-		m_tabs[m_tabs.size() - 2].r = rcTabBar;
-		m_tabs[m_tabs.size() - 1].bVisible = true;
-		m_tabs[m_tabs.size() - 2].bVisible = true;
-		m_tabs[m_tabs.size() - 2].r.left = rcTabBar.right - wSysButton * 2;
-		m_tabs[m_tabs.size() - 2].r.right = m_tabs[m_tabs.size() - 2].r.left + wSysButton;
-		m_tabs[m_tabs.size() - 1].r.left = rcTabBar.left;
-		m_tabs[m_tabs.size() - 1].r.right = m_tabs[m_tabs.size() - 1].r.left + wSysButton;
+		m_tab_buttons[LEFT].r = rcTabBar;
+		m_tab_buttons[RIGHT].r = rcTabBar;
+		m_tab_buttons[LEFT].bVisible = true;
+		m_tab_buttons[RIGHT].bVisible = true;
+		m_tab_buttons[RIGHT].r.left = rcTabBar.right - wSysButton * 2;
+		m_tab_buttons[RIGHT].r.right = m_tab_buttons[RIGHT].r.left + wSysButton;
+		m_tab_buttons[LEFT].r.left = rcTabBar.left;
+		m_tab_buttons[LEFT].r.right = m_tab_buttons[LEFT].r.left + wSysButton;
 
 	}
 	else if (wTsSize <= rcTabBar.right - wSysButton) {
 		rcTPage.left = rcTabBar.left;
 	}
 
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		auto& tab = m_tabs[i];
 
 		tab.r = rcTabBar;
@@ -3388,15 +3383,16 @@ void CPlayerPlaylistBar::TIndexHighighted()
 	GetCursorPos(&p);
 	ScreenToClient(&p);
 
+	m_tab_idx = -1;
 	m_button_idx = -1;
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
-		if (m_tabs[i].r.PtInRect(p) && m_tabs[i].bVisible && rcTPage.PtInRect(p)) {
-			m_button_idx = i;
+	for (size_t i = 0; i < m_tabs.size(); i++) {
+		if (m_tabs[i].r.PtInRect(p) && rcTPage.PtInRect(p)) {
+			m_tab_idx = i;
 			return;
 		}
 	}
-	for (size_t i = m_tabs.size() - 3; i < m_tabs.size(); i++) {
-		if (m_tabs[i].r.PtInRect(p) && m_tabs[i].bVisible) {
+	for (size_t i = 0; i < std::size(m_tab_buttons); i++) {
+		if (m_tab_buttons[i].bVisible && m_tab_buttons[i].r.PtInRect(p)) {
 			m_button_idx = i;
 			return;
 		}
@@ -3433,20 +3429,20 @@ void CPlayerPlaylistBar::TDrawBar()
 		// background Tab bar
 		mdc.FillSolidRect(rcTabBar, m_crBkBar);
 
-		for (size_t i = m_tabs.size() - 3; i < m_tabs.size(); i++) {
-			auto& tab = m_tabs[i];
-			if (tab.bVisible) {
+		for (size_t i = 0; i < std::size(m_tab_buttons); i++) {
+			auto& button = m_tab_buttons[i];
+			if (button.bVisible) {
 				// Buttons
-				mdc.Draw3dRect(tab.r, m_crBNL, m_crBND);
+				mdc.Draw3dRect(button.r, m_crBNL, m_crBND);
 				mdc.SetTextColor(m_crTN);
-				mdc.DrawText(tab.name, tab.name.GetLength(), &tab.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+				mdc.DrawText(button.name, button.name.GetLength(), &button.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
 				// Highlighted Buttons
-				if (i == m_button_idx && m_button_idx != m_nCurPlayListIndex) {
+				if (i == m_button_idx) {
 					mdc.SetTextColor(m_crTH);
-					mdc.FillSolidRect(tab.r, m_crBH);
-					mdc.Draw3dRect(tab.r, m_crBHL, m_crBHD);
-					mdc.DrawText(tab.name, tab.name.GetLength(), &tab.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+					mdc.FillSolidRect(button.r, m_crBH);
+					mdc.Draw3dRect(button.r, m_crBHL, m_crBHD);
+					mdc.DrawText(button.name, button.name.GetLength(), &button.r, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				}
 			}
 		}
@@ -3455,36 +3451,33 @@ void CPlayerPlaylistBar::TDrawBar()
 
 		HRGN hRgnExclude = ::CreateRectRgnIndirect(&rcTPage);
 		SelectClipRgn(mdc, hRgnExclude);
-		for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+		for (size_t i = 0; i < m_tabs.size(); i++) {
 			auto& tab = m_tabs[i];
 			CRect rcText = tab.r;
 			rcText.DeflateRect(2, 2, 2, 2);
 			// tab
-			if (tab.bVisible) {
-				mdc.SetTextColor(m_crTN);
+			mdc.SetTextColor(m_crTN);
+			mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+			// higjlighted tab
+			if (i == m_tab_idx && m_tab_idx != m_nCurPlayListIndex) {
+				mdc.SetTextColor(m_crTH);
+				mdc.FillSolidRect(tab.r, m_crBH);
+				mdc.Draw3dRect(tab.r, m_crBHL, m_crBHL);
 				mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-				// higjlighted tab
-				if (i == m_button_idx && m_button_idx != m_nCurPlayListIndex) {
-					mdc.SetTextColor(m_crTH);
-					mdc.FillSolidRect(tab.r, m_crBH);
-					mdc.Draw3dRect(tab.r, m_crBHL, m_crBHL);
+			}
+			// current activetab
+			if (i == m_nCurPlayListIndex) {
+				if (i == m_tab_idx) { // selected and highlighted
+					mdc.SetTextColor(m_crTS);
+					mdc.FillSolidRect(tab.r, m_crBSH);
+					mdc.Draw3dRect(tab.r, m_crBSHL, m_crBSHL);
 					mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				}
-				// current activetab
-				if (i == m_nCurPlayListIndex) {
-					if (i == m_button_idx) { // selected and highlighted
-						mdc.SetTextColor(m_crTS);
-						mdc.FillSolidRect(tab.r, m_crBSH);
-						mdc.Draw3dRect(tab.r, m_crBSHL, m_crBSHL);
-						mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-					}
-					else { // selected
-						mdc.FillSolidRect(tab.r, m_crBS);
-						mdc.SetTextColor(m_crTS);
-						mdc.Draw3dRect(tab.r, m_crBSL, m_crBSL);
-						mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-					}
-
+				else { // selected
+					mdc.FillSolidRect(tab.r, m_crBS);
+					mdc.SetTextColor(m_crTS);
+					mdc.Draw3dRect(tab.r, m_crBSL, m_crBSL);
+					mdc.DrawText(tab.name.GetString(), tab.name.GetLength(), &rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 				}
 			}
 		}
@@ -3507,8 +3500,8 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 		GetCursorPos(&p);
 	}
 	else {
-		p.x = m_tabs[m_tabs.size() - 3].r.left;
-		p.y = m_tabs[m_tabs.size() - 3].r.bottom;
+		p.x = m_tab_buttons[MENU].r.left;
+		p.y = m_tab_buttons[MENU].r.bottom;
 		ClientToScreen(&p);
 	}
 	
@@ -3519,7 +3512,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 
 	UINT id = 1;
 	CMenu submenu;
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		UINT flags = MF_BYPOSITION | MF_STRING | MF_ENABLED;
 		if (i == m_nCurPlayListIndex) {
 			flags |= MF_CHECKED | MFT_RADIOCHECK;
@@ -3551,7 +3544,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 	CString strGetName;
 	
 	int nID = (int)menu.TrackPopupMenu(TPM_LEFTBUTTON | TPM_RETURNCMD, p.x, p.y, this);
-	int size = m_tabs.size() - 3;
+	int size = m_tabs.size();
 
 	bool bNewExplorer = false;
 
@@ -3567,7 +3560,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 			case 1: // ADD PLAYLIST TAB
 				{
 					size_t cnt = 1;
-					for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+					for (size_t i = 0; i < m_tabs.size(); i++) {
 						if (m_tabs[i].type == PLAYLIST && i > 0) {
 							cnt++;
 						}
@@ -3604,7 +3597,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 			case 2: // ADD EXPLORER TAB
 				{
 					size_t cnt = 1;
-					for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+					for (size_t i = 0; i < m_tabs.size(); i++) {
 						if (m_tabs[i].type == EXPLORER) {
 							cnt++;
 						}
@@ -3674,7 +3667,7 @@ void CPlayerPlaylistBar::TOnMenu(bool bUnderCursor)
 					SAFE_DELETE(m_pls[m_nCurPlayListIndex]);
 					m_pls.erase(m_pls.begin() + m_nCurPlayListIndex);
 
-					if (m_tabs.size() - 3 <= m_nCurPlayListIndex) {
+					if (m_tabs.size() <= m_nCurPlayListIndex) {
 						m_nCurPlayListIndex--;
 					}
 
@@ -3705,7 +3698,7 @@ void CPlayerPlaylistBar::TDeleteAllPlaylists()
 {
 	m_pMainFrame->SendMessageW(WM_COMMAND, ID_FILE_CLOSEMEDIA);
 	
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		CString base;
 		if (AfxGetMyApp()->GetAppSavePath(base)) {
 			base.Append(m_tabs[i].fn);
@@ -3721,7 +3714,7 @@ void CPlayerPlaylistBar::TSaveAllPlaylists()
 {
 	const auto nCurPlayListIndex = m_nCurPlayListIndex;
 
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		m_nCurPlayListIndex = i;
 		SavePlaylist();
 	}
@@ -3883,10 +3876,10 @@ void CPlayerPlaylistBar::TSaveSettings()
 		// the first stroke has only saved last active playlist index and tabs offset (first visible tab on tabbar)
 		str.AppendFormat(L"%d;%d;|", m_nCurPlayListIndex, cntOffset);
 		// only tabs, buttons don't save
-		const auto last = m_tabs.size() - 3 - 1;
+		const auto last = m_tabs.size() - 1;
 		for (size_t i = 0; i <= last; i++) {
 			CString s;
-			str.AppendFormat(L"%d;%s;%d;%s", m_tabs[i].type, RemoveFileExt(m_tabs[i].fn.GetString()), m_tabs[i].bVisible ? 1 : 0, i < last ? L"|" : L"");
+			str.AppendFormat(L"%d;%s%s", m_tabs[i].type, RemoveFileExt(m_tabs[i].fn.GetString()), i < last ? L"|" : L"");
 		}
 	}
 
@@ -3917,7 +3910,6 @@ void CPlayerPlaylistBar::TGetSettings()
 		tpl.type = _wtoi(arFields[0]);
 		tpl.name = m_pls.empty() ? ResStr(IDF_LOGO1) : arFields[1];
 		tpl.fn = arFields[1] + (L".mpcpl");
-		tpl.bVisible = _wtoi(arFields[2]);
 		m_tabs.push_back(tpl);
 
 		CPlaylist* pl = DNew CPlaylist;
@@ -3940,20 +3932,11 @@ void CPlayerPlaylistBar::TGetSettings()
 		}
 	}
 
-	// + create 3 buttons (menu, left arrow, right arrow)
-	for (int i = 0; i < 3; i++) {
-		tab tpl;
-		tpl.type = BUTTON;
-		tpl.name = i == 0 ? L"::" : i == 1 ? L">" : L"<";
-		tpl.bVisible = i == 0 ? true : false;
-		m_tabs.push_back(tpl);
-	}
-
-	if (cntOffset >= (m_tabs.size() - 3)) {
+	if (cntOffset >= m_tabs.size()) {
 		cntOffset = 0;
 	}
 
-	if (m_nCurPlayListIndex > m_tabs.size() - 3) {
+	if (m_nCurPlayListIndex >= m_tabs.size()) {
 		m_nCurPlayListIndex = 0;
 	}
 }
@@ -3961,17 +3944,18 @@ void CPlayerPlaylistBar::TGetSettings()
 void CPlayerPlaylistBar::TSetOffset(bool toRight)
 {
 	if (toRight) {
-		for (size_t i = 1; i < m_tabs.size() - 3; i++) {
+		for (size_t i = 1; i < m_tabs.size(); i++) {
 			if (m_tabs[i].r.left == rcTPage.left) {
-				if (cntOffset > 0)
+				if (cntOffset > 0) {
 					cntOffset--;
+				}
 				return;
 			}
 		}
 		return;
 	}
 	
-	for (size_t i = 0; i < m_tabs.size() - 4; i++) {
+	for (size_t i = 0; i < m_tabs.size() - 1; i++) {
 		if (m_tabs[i].r.left == rcTPage.left) {
 			cntOffset++;
 			return;
@@ -3998,7 +3982,7 @@ void CPlayerPlaylistBar::TEnsureVisible(int idx)
 	}
 
 	if (m_tabs[idx].r.left < rcTPage.left) {
-		for (size_t i = idx; i < m_tabs.size() - 3; i++) {
+		for (size_t i = idx; i < m_tabs.size(); i++) {
 			if (cntOffset > 0) {
 				cntOffset--;
 			}
@@ -4020,7 +4004,7 @@ void CPlayerPlaylistBar::TEnsureVisible(int idx)
 int CPlayerPlaylistBar::TGetFirstVisible()
 {
 	int idx = -1;
-	for (size_t i = 0; i < m_tabs.size() - 3; i++) {
+	for (size_t i = 0; i < m_tabs.size(); i++) {
 		idx++;
 		if (m_tabs[i].r.left == rcTPage.left) {
 			return idx;
