@@ -132,8 +132,8 @@ END
 
 BEGIN DIALOGEX IDD_PLAYLISTNAME LINES 10
 3		"Playlist Name Dialog"
-6		"ОК"
-7		"Отмена"
+6		"Ok"
+7		"Cancel"
 9		"Name:"
 END
 

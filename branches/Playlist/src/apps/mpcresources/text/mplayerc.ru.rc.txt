@@ -132,7 +132,7 @@ END
 
 BEGIN DIALOGEX IDD_PLAYLISTNAME LINES 10
 3		"Новое имя плейлиста"
-6		"ОК"
+6		"Ок"
 7		"Отмена"
 9		"Название:"
 END
