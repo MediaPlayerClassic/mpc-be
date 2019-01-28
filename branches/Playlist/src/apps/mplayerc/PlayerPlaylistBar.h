@@ -119,7 +119,8 @@ public:
 	int m_ainput;
 	long m_country;
 
-	bool m_fInvalid;
+	bool m_bInvalid;
+	bool m_bDirectory;
 
 public:
 	CPlaylistItem();
@@ -129,7 +130,7 @@ public:
 	CPlaylistItem& operator = (const CPlaylistItem& pli);
 
 	bool FindFile(LPCTSTR path);
-	bool FindFolder(LPCTSTR path);
+	bool FindFolder(LPCTSTR path) const;
 	void AutoLoadFiles();
 
 	CString GetLabel(int i = 0);
@@ -349,7 +350,7 @@ public:
 	void SetFirstSelected();
 	void SetFirst();
 	void SetLast();
-	void SetCurValid(bool fValid);
+	void SetCurValid(const bool bValid);
 	void SetCurTime(REFERENCE_TIME rt);
 	void SetCurLabel(CString label);
 	void Randomize();
