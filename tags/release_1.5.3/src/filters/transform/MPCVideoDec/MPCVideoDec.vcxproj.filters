@@ -1,0 +1,143 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{e15c9785-536b-4371-9e8e-ddbcfdb5c17e}</UniqueIdentifier>
+      <Extensions>cpp;c;cxx;def;odl;idl;hpj;bat;asm</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{2f29e203-dfe5-49ab-8326-55ff62a38d80}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{29435264-dc59-4006-a197-91a4bd1e583f}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe</Extensions>
+    </Filter>
+    <Filter Include="Source Files\DXVADecoder">
+      <UniqueIdentifier>{2142786b-97ca-4daa-bedf-1cd9e788e19f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\DXVADecoder">
+      <UniqueIdentifier>{26a70972-2c74-42ba-b2a6-c6652f6df5a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MSDKDecoder">
+      <UniqueIdentifier>{3a7990f6-f5c9-458f-9bfb-3e29856a3553}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\MSDKDecoder">
+      <UniqueIdentifier>{02056a7c-9383-416f-a91c-9892dc07a79e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MSDKDecoder\include">
+      <UniqueIdentifier>{6dcd5a6f-58d7-47b6-bf30-e20e765f189d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="ffmpegContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FormatConverter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MPCVideoDec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MPCVideoDecSettingsWnd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pixconv_functions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DXVADecoder\DXVA2Decoder.cpp">
+      <Filter>Source Files\DXVADecoder</Filter>
+    </ClCompile>
+    <ClCompile Include="MSDKDecoder\MSDKDecoder.cpp">
+      <Filter>Source Files\MSDKDecoder</Filter>
+    </ClCompile>
+    <ClCompile Include="MSDKDecoder\ByteParser.cpp">
+      <Filter>Source Files\MSDKDecoder</Filter>
+    </ClCompile>
+    <ClCompile Include="DXVADecoder\DXVAAllocator.cpp">
+      <Filter>Source Files\DXVADecoder</Filter>
+    </ClCompile>
+    <ClCompile Include="DXVADecoder\MediaSampleSideData.cpp">
+      <Filter>Source Files\DXVADecoder</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ffmpegContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FormatConverter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IMPCVideoDec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MPCVideoDec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MPCVideoDecSettingsWnd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pixconv_sse2_templates.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DXVADecoder\DXVA2Decoder.h">
+      <Filter>Header Files\DXVADecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="DXVADecoder\stdafx.h">
+      <Filter>Header Files\DXVADecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\growarray.h">
+      <Filter>Header Files\MSDKDecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\MSDKDecoder.h">
+      <Filter>Header Files\MSDKDecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\stdafx.h">
+      <Filter>Header Files\MSDKDecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxcommon.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxdefs.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxmvc.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxsession.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxstructures.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxvideo.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\include\mfxvstructures.h">
+      <Filter>Header Files\MSDKDecoder\include</Filter>
+    </ClInclude>
+    <ClInclude Include="MSDKDecoder\ByteParser.h">
+      <Filter>Header Files\MSDKDecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="DXVADecoder\DXVAAllocator.h">
+      <Filter>Header Files\DXVADecoder</Filter>
+    </ClInclude>
+    <ClInclude Include="DXVADecoder\MediaSampleSideData.h">
+      <Filter>Header Files\DXVADecoder</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="MPCVideoDec.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
