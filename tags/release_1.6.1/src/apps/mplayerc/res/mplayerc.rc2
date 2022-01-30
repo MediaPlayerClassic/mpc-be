@@ -1,0 +1,227 @@
+//
+// mplayerc.rc2 - resources Microsoft Visual C++ does not edit directly
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+#include "resource.h"
+#include "Version.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// English (United States) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// RT_MANIFEST
+//
+
+1                       RT_MANIFEST             "res\\mpc-be.exe.manifest"
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// FILE
+//
+
+IDF_LOGO0                        FILE                    "res\\logo.0.png"
+IDF_LOGO1                        FILE                    "res\\logo.1.png"
+IDF_1PIX_GIF                     FILE                    "res\\web\\1pix.gif"
+IDF_BOTTOMSIDE_PNG               FILE                    "res\\web\\bottomside.png"
+IDF_CONTROLBACK_PNG              FILE                    "res\\web\\controlback.png"
+IDF_CONTROLBUTTONDECRATE_PNG     FILE                    "res\\web\\controlbuttondecrate.png"
+IDF_CONTROLBUTTONINCRATE_PNG     FILE                    "res\\web\\controlbuttonincrate.png"
+IDF_CONTROLBUTTONPAUSE_PNG       FILE                    "res\\web\\controlbuttonpause.png"
+IDF_CONTROLBUTTONPLAY_PNG        FILE                    "res\\web\\controlbuttonplay.png"
+IDF_CONTROLBUTTONSKIPBACK_PNG    FILE                    "res\\web\\controlbuttonskipback.png"
+IDF_CONTROLBUTTONSKIPFORWARD_PNG FILE                    "res\\web\\controlbuttonskipforward.png"
+IDF_CONTROLBUTTONSTEP_PNG        FILE                    "res\\web\\controlbuttonstep.png"
+IDF_CONTROLBUTTONSTOP_PNG        FILE                    "res\\web\\controlbuttonstop.png"
+IDF_CONTROLVOLUMEBAR_PNG         FILE                    "res\\web\\controlvolumebar.png"
+IDF_CONTROLVOLUMEGRIP_PNG        FILE                    "res\\web\\controlvolumegrip.png"
+IDF_CONTROLVOLUMEOFF_PNG         FILE                    "res\\web\\controlvolumeoff.png"
+IDF_CONTROLVOLUMEON_PNG          FILE                    "res\\web\\controlvolumeon.png"
+IDF_DEFAULT_CSS                  FILE                    "res\\web\\default.css"
+IDF_HEADERBACK_PNG               FILE                    "res\\web\\headerback.png"
+IDF_HEADERCLOSE_PNG              FILE                    "res\\web\\headerclose.png"
+IDF_HEADERICON_PNG               FILE                    "res\\web\\headericon.png"
+IDF_LEFTBOTTOMSIDE_PNG           FILE                    "res\\web\\leftbottomside.png"
+IDF_LEFTSIDE_PNG                 FILE                    "res\\web\\leftside.png"
+IDF_RIGHTBOTTOMSIDE_PNG          FILE                    "res\\web\\rightbottomside.png"
+IDF_RIGHTSIDE_PNG                FILE                    "res\\web\\rightside.png"
+IDF_SEEKBARGRIP_PNG              FILE                    "res\\web\\seekbargrip.png"
+IDF_SEEKBARLEFT_PNG              FILE                    "res\\web\\seekbarleft.png"
+IDF_SEEKBARMID_PNG               FILE                    "res\\web\\seekbarmid.png"
+IDF_SEEKBARRIGHT_PNG             FILE                    "res\\web\\seekbarright.png"
+IDF_SLIDERBACK_PNG               FILE                    "res\\web\\sliderback.png"
+IDF_SLIDERBAR_GIF                FILE                    "res\\web\\sliderbar.gif"
+IDF_SLIDERGRIP_GIF               FILE                    "res\\web\\slidergrip.gif"
+IDF_VBR_PNG                      FILE                    "res\\web\\vbg.png"
+IDF_VBS_PNG                      FILE                    "res\\web\\vbs.png"
+IDF_FAVICON                      FILE                    "res\\web\\favicon.png"
+IDF_SHADER_EMPTY                 FILE                    "res\\empty.hlsl"
+IDF_SHADER_FINAL                 FILE                    "..\\..\\Shaders\\Transformation\\final_pass.hlsl"
+
+IDF_SHADER_RESIZER_BSPLINE4_X    FILE                    "..\\..\\..\\bin\\shaders\\resizer_bspline4_x.cso"
+IDF_SHADER_RESIZER_BSPLINE4_Y    FILE                    "..\\..\\..\\bin\\shaders\\resizer_bspline4_y.cso"
+IDF_SHADER_RESIZER_MITCHELL4_X   FILE                    "..\\..\\..\\bin\\shaders\\resizer_mitchell4_x.cso"
+IDF_SHADER_RESIZER_MITCHELL4_Y   FILE                    "..\\..\\..\\bin\\shaders\\resizer_mitchell4_y.cso"
+IDF_SHADER_RESIZER_CATMULL4_X    FILE                    "..\\..\\..\\bin\\shaders\\resizer_catmull4_x.cso"
+IDF_SHADER_RESIZER_CATMULL4_Y    FILE                    "..\\..\\..\\bin\\shaders\\resizer_catmull4_y.cso"
+IDF_SHADER_RESIZER_BICUBIC06_X   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic06_x.cso"
+IDF_SHADER_RESIZER_BICUBIC06_Y   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic06_y.cso"
+IDF_SHADER_RESIZER_BICUBIC08_X   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic08_x.cso"
+IDF_SHADER_RESIZER_BICUBIC08_Y   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic08_y.cso"
+IDF_SHADER_RESIZER_BICUBIC10_X   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic10_x.cso"
+IDF_SHADER_RESIZER_BICUBIC10_Y   FILE                    "..\\..\\..\\bin\\shaders\\resizer_bicubic10_y.cso"
+IDF_SHADER_RESIZER_LANCZOS2_X    FILE                    "..\\..\\..\\bin\\shaders\\resizer_lanczos2_x.cso"
+IDF_SHADER_RESIZER_LANCZOS2_Y    FILE                    "..\\..\\..\\bin\\shaders\\resizer_lanczos2_y.cso"
+IDF_SHADER_RESIZER_LANCZOS3_X    FILE                    "..\\..\\..\\bin\\shaders\\resizer_lanczos3_x.cso"
+IDF_SHADER_RESIZER_LANCZOS3_Y    FILE                    "..\\..\\..\\bin\\shaders\\resizer_lanczos3_y.cso"
+IDF_SHADER_DOWNSCALER_SIMPLE_X   FILE                    "..\\..\\..\\bin\\shaders\\downscaler_simple_x.cso"
+IDF_SHADER_DOWNSCALER_SIMPLE_Y   FILE                    "..\\..\\..\\bin\\shaders\\downscaler_simple_y.cso"
+IDF_SHADER_DOWNSCALER_BOX_X      FILE                    "..\\..\\..\\bin\\shaders\\downscaler_box_x.cso"
+IDF_SHADER_DOWNSCALER_BOX_Y      FILE                    "..\\..\\..\\bin\\shaders\\downscaler_box_y.cso"
+IDF_SHADER_DOWNSCALER_BILINEAR_X FILE                    "..\\..\\..\\bin\\shaders\\downscaler_bilinear_x.cso"
+IDF_SHADER_DOWNSCALER_BILINEAR_Y FILE                    "..\\..\\..\\bin\\shaders\\downscaler_bilinear_y.cso"
+IDF_SHADER_DOWNSCALER_HAMMING_X  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_hamming_x.cso"
+IDF_SHADER_DOWNSCALER_HAMMING_Y  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_hamming_y.cso"
+IDF_SHADER_DOWNSCALER_BICUBIC_X  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_bicubic_x.cso"
+IDF_SHADER_DOWNSCALER_BICUBIC_Y  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_bicubic_y.cso"
+IDF_SHADER_DOWNSCALER_LANCZOS_X  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_lanczos_x.cso"
+IDF_SHADER_DOWNSCALER_LANCZOS_Y  FILE                    "..\\..\\..\\bin\\shaders\\downscaler_lanczos_y.cso"
+IDF_SHADER_CORRECTION_YCGCO      FILE                    "..\\..\\..\\bin\\shaders\\ycgco_correction.cso"
+IDF_SHADER_CONVERT_PQ_TO_SDR     FILE                    "..\\..\\..\\bin\\shaders\\convert_pq_to_sdr.cso"
+IDF_SHADER_CONVERT_2020_TO_709   FILE                    "..\\..\\..\\bin\\shaders\\convert_bt2020_to_bt709.cso"
+IDF_SHADER_CORRECTION_422        FILE                    "..\\..\\..\\bin\\shaders\\chroma_422_correction.cso"
+IDF_SHADER_CONVERT_TO_INTERLACE  FILE                    "..\\..\\..\\bin\\shaders\\halfoverunder_to_interlace.cso"
+
+IDF_SHADER_PS20_BSPLINE4_X       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bspline4_x.cso"
+IDF_SHADER_PS20_BSPLINE4_Y       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bspline4_y.cso"
+IDF_SHADER_PS20_MITCHELL4_X      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_mitchell4_x.cso"
+IDF_SHADER_PS20_MITCHELL4_Y      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_mitchell4_y.cso"
+IDF_SHADER_PS20_CATMULL4_X       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_catmull4_x.cso"
+IDF_SHADER_PS20_CATMULL4_Y       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_catmull4_y.cso"
+IDF_SHADER_PS20_BICUBIC06_X      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic06_x.cso"
+IDF_SHADER_PS20_BICUBIC06_Y      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic06_y.cso"
+IDF_SHADER_PS20_BICUBIC08_X      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic08_x.cso"
+IDF_SHADER_PS20_BICUBIC08_Y      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic08_y.cso"
+IDF_SHADER_PS20_BICUBIC10_X      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic10_x.cso"
+IDF_SHADER_PS20_BICUBIC10_Y      FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_bicubic10_y.cso"
+IDF_SHADER_PS20_LANCZOS2_X       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_lanczos2_x.cso"
+IDF_SHADER_PS20_LANCZOS2_Y       FILE                    "..\\..\\..\\bin\\shaders\\ps20_resizer_lanczos2_y.cso"
+IDF_SHADER_PS20_DOWNSCALER_SIMPLE_X  FILE                "..\\..\\..\\bin\\shaders\\ps20_downscaler_simple_x.cso"
+IDF_SHADER_PS20_DOWNSCALER_SIMPLE_Y  FILE                "..\\..\\..\\bin\\shaders\\ps20_downscaler_simple_y.cso"
+IDF_SHADER_PS20_DOWNSCALER_BOX_X     FILE                "..\\..\\..\\bin\\shaders\\ps20_downscaler_box_x.cso"
+IDF_SHADER_PS20_DOWNSCALER_BOX_Y     FILE                "..\\..\\..\\bin\\shaders\\ps20_downscaler_box_y.cso"
+IDF_SHADER_PS20_CORRECTION_YCGCO     FILE                "..\\..\\..\\bin\\shaders\\ps20_ycgco_correction.cso"
+IDF_SHADER_PS20_CONVERT_PQ_TO_SDR    FILE                "..\\..\\..\\bin\\shaders\\ps20_convert_pq_to_sdr.cso"
+IDF_SHADER_PS20_CONVERT_2020_TO_709  FILE                "..\\..\\..\\bin\\shaders\\ps20_convert_bt2020_to_bt709.cso"
+IDF_SHADER_PS20_CORRECTION_422       FILE                "..\\..\\..\\bin\\shaders\\ps20_chroma_422_correction.cso"
+IDF_SHADER_PS20_CONVERT_TO_INTERLACE FILE                "..\\..\\..\\bin\\shaders\\ps20_halfoverunder_to_interlace.cso"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// HTML
+//
+
+IDR_HTML_404                     HTML                    "res\\web\\404.html"
+IDR_HTML_BROWSER                 HTML                    "res\\web\\browser.html"
+IDR_HTML_CONTROLS                HTML                    "res\\web\\controls.html"
+IDR_HTML_INDEX                   HTML                    "res\\web\\index.html"
+IDR_HTML_INFO                    HTML                    "res\\web\\info.html"
+IDR_HTML_PLAYER                  HTML                    "res\\web\\player.html"
+IDR_HTML_VARIABLES               HTML                    "res\\web\\variables.html"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+IDR_MAINFRAME                    ICON                    "res\\icon.ico"
+IDI_AUDIOCD                      ICON                    "res\\Icon_41.ico"
+IDI_DVD                          ICON                    "res\\Icon_114.ico"
+IDI_UNKNOWN                      ICON                    "res\\Icon_116.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Bitmap
+//
+
+IDB_MONO                         BITMAP                  "res\\mono.bmp"
+IDB_STEREO                       BITMAP                  "res\\stereo.bmp"
+IDB_NOAUDIO                      BITMAP                  "res\\noaudio.bmp"
+IDB_STREAMTYPES                  BITMAP                  "res\\streamtypes.bmp"
+IDF_SVG_ONOFF                    FILE                    "res\\onoff.svg"
+IDF_SVG_TOOLBAR                  FILE                    "res\\toolbar.svg"
+IDF_SVG_GPU_INDICATOR            FILE                    "res\\gpu.svg"
+IDF_SVG_FLYBAR                   FILE                    "res\\flybar.svg"
+IDF_SVG_TASKBAR_BUTTONS          FILE                    "res\\taskbar_buttons.svg"
+IDF_SVG_TASKBAR_STATE_ICONS      FILE                    "res\\taskbar_state_icons.svg"
+IDB_W7_AUDIO                     FILE                    "res\\audio.png"
+IDF_MAIN_ICON                    FILE                    "res\\main.png"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION MPC_VERSION_SVN_NUM
+ PRODUCTVERSION MPC_VERSION_NUM
+ FILEFLAGSMASK 0x1fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "Based on the original MPC v6.4.9.0 © Gabest & MPC-HC"
+            VALUE "CompanyName", MPC_COMP_NAME_STR
+            VALUE "FileVersion", MPC_VERSION_SVN_STR
+            VALUE "LegalCopyright", MPC_COPYRIGHT_STR
+#ifdef _WIN64
+            VALUE "FileDescription", "MPC-BE x64"
+            VALUE "InternalName", "mpc-be64"
+            VALUE "OriginalFilename", "mpc-be64.exe"
+            VALUE "ProductName", "MPC-BE x64"
+#else
+            VALUE "FileDescription", "MPC-BE"
+            VALUE "InternalName", "mpc-be"
+            VALUE "OriginalFilename", "mpc-be.exe"
+            VALUE "ProductName", "MPC-BE"
+#endif
+            VALUE "ProductVersion", MPC_VERSION_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+#endif    // English (United States) resources
